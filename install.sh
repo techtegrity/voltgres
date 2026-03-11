@@ -103,11 +103,35 @@ if [ -n "$domain" ]; then
     fi
 fi
 
+# IP Whitelist (only when domain is set)
+allowed_ips=""
+if [ -n "$domain" ]; then
+    echo -e "Restrict access to specific IP addresses (optional)."
+    echo -e "  Enter comma-separated IPs or CIDRs (e.g. ${CYAN}203.0.113.5, 10.0.0.0/8${NC})"
+    read -p "Leave blank for public access: " allowed_ips_input
+    echo ""
+    if [ -n "$allowed_ips_input" ]; then
+        # Convert comma-separated to space-separated for Caddy
+        allowed_ips=$(echo "$allowed_ips_input" | tr ',' ' ' | tr -s ' ')
+    fi
+fi
+
 # PostgreSQL password
 default_pg_pass=$(openssl rand -base64 16 | tr -d '=/+' | head -c 20)
 echo -e "PostgreSQL password for the bundled database."
 read -p "Press Enter for auto-generated [$default_pg_pass]: " pg_pass
 pg_pass=${pg_pass:-$default_pg_pass}
+echo ""
+
+# Google OAuth (optional)
+echo -e "Google OAuth (optional — enables ${CYAN}Sign in with Google${NC})"
+read -p "Google Client ID (leave blank to skip): " google_client_id
+google_client_secret=""
+google_enabled="false"
+if [ -n "$google_client_id" ]; then
+    read -p "Google Client Secret: " google_client_secret
+    google_enabled="true"
+fi
 echo ""
 
 # Generate auth secret
@@ -118,6 +142,28 @@ if [ -n "$domain" ]; then
     app_url="https://$domain"
 else
     app_url="http://localhost:3000"
+fi
+
+# Generate Caddyfile (only matters when domain is set)
+if [ -n "$domain" ]; then
+    if [ -n "$allowed_ips" ]; then
+        cat > Caddyfile << 'CADDYEOF'
+{$DOMAIN} {
+	@blocked {
+		not remote_ip {$ALLOWED_IPS}
+	}
+	respond @blocked "Access denied" 403
+
+	reverse_proxy voltgres:3000
+}
+CADDYEOF
+    else
+        cat > Caddyfile << 'CADDYEOF'
+{$DOMAIN} {
+	reverse_proxy voltgres:3000
+}
+CADDYEOF
+    fi
 fi
 
 # Write .env
@@ -134,9 +180,13 @@ NEXT_PUBLIC_APP_URL=$app_url
 # Domain for HTTPS (leave empty for localhost/HTTP only)
 DOMAIN=$domain
 
+# IP whitelist (space-separated IPs/CIDRs, empty = public)
+ALLOWED_IPS=$allowed_ips
+
 # Google OAuth (optional)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
+GOOGLE_CLIENT_ID=$google_client_id
+GOOGLE_CLIENT_SECRET=$google_client_secret
+NEXT_PUBLIC_GOOGLE_ENABLED=$google_enabled
 
 # Bundled PostgreSQL
 POSTGRES_USER=postgres
