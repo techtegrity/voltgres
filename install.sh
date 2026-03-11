@@ -76,6 +76,27 @@ echo -e "Enter your domain name for HTTPS (e.g. ${CYAN}db.example.com${NC})"
 read -p "Leave blank for localhost (no HTTPS): " domain
 echo ""
 
+if [ -n "$domain" ]; then
+    # Detect public IP
+    public_ip=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 icanhazip.com 2>/dev/null || echo "")
+    if [ -n "$public_ip" ]; then
+        echo -e "${YELLOW}${BOLD}DNS Setup Required${NC}"
+        echo -e "  Create an ${BOLD}A record${NC} for your domain:"
+        echo ""
+        echo -e "    ${CYAN}${domain}${NC}  →  ${CYAN}${public_ip}${NC}"
+        echo ""
+        echo -e "  Let's Encrypt needs this to issue your HTTPS certificate."
+        echo -e "  Make sure the DNS record is active before continuing."
+        echo ""
+        read -p "Press Enter when your DNS is configured... "
+        echo ""
+    else
+        echo -e "${YELLOW}Could not detect your server's public IP.${NC}"
+        echo -e "  Make sure you create an A record pointing ${CYAN}${domain}${NC} to this server."
+        echo ""
+    fi
+fi
+
 # PostgreSQL password
 default_pg_pass=$(openssl rand -base64 16 | tr -d '=/+' | head -c 20)
 echo -e "PostgreSQL password for the bundled database."
