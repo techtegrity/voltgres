@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Skip middleware for static files, API routes, and the setup page itself
+  // Skip proxy for static files, API routes, and the setup page itself
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
