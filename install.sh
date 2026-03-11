@@ -21,11 +21,13 @@ if ! command -v docker &> /dev/null; then
         if [[ ! "$install_docker" =~ ^[Nn]$ ]]; then
             echo "Installing Docker..."
             curl -fsSL https://get.docker.com | sh
-            sudo usermod -aG docker "$USER"
             echo -e "${GREEN}Docker installed.${NC}"
-            echo -e "${YELLOW}You need to log out and back in for group changes to take effect.${NC}"
-            echo "Then re-run: ./install.sh"
-            exit 0
+            # If not root, add user to docker group and re-exec
+            if [ "$(id -u)" -ne 0 ]; then
+                sudo usermod -aG docker "$USER"
+                echo "Applying docker group membership..."
+                exec sg docker -c "$0"
+            fi
         fi
     else
         echo "  Install Docker Desktop from https://docker.com/products/docker-desktop"
