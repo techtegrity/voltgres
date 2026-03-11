@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add drizzle-orm better-sqlite3 better-auth pg)",
+      "Bash(pnpm add -D drizzle-kit @types/better-sqlite3 @types/pg)",
+      "Bash(pnpm approve-builds better-sqlite3)",
+      "Bash(xargs ls -la)",
+      "Bash(lsof -i :3000 -P -n)",
+      "Bash(ps -p 99247 -o pid,ppid,command)",
+      "Bash(cat '/Users/chris/Repos/mine/Techtegrity/voltgres/voltgres/app/dashboard/\\(org\\)/page.tsx')"
+    ]
+  }
+}

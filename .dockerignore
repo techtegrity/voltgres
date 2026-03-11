@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env.example
+.env*.local
+voltgres.db
+voltgres.db-wal
+voltgres.db-shm
+.DS_Store
+*.md
+nginx.conf.example
+Caddyfile
+install.sh

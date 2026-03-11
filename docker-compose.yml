@@ -1,0 +1,54 @@
+services:
+  voltgres:
+    build: .
+    container_name: voltgres
+    restart: unless-stopped
+    ports:
+      - "${VOLTGRES_PORT:-3000}:3000"
+    environment:
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - VOLTGRES_DB_PATH=/app/data/voltgres.db
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - DOMAIN=${DOMAIN:-}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
+    volumes:
+      - voltgres-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - voltgres-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: voltgres-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voltgres-net
+
+volumes:
+  voltgres-data:
+  postgres-data:
+
+networks:
+  voltgres-net:
+    driver: bridge
