@@ -60,7 +60,13 @@ if [ -f .env ]; then
     read -p "Overwrite it? (y/N): " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
         echo "Keeping existing .env. Starting containers..."
-        docker compose up -d --build
+        # Source .env to check if DOMAIN is set
+        existing_domain=$(grep '^DOMAIN=' .env | cut -d= -f2-)
+        if [ -n "$existing_domain" ]; then
+            docker compose --profile https up -d --build
+        else
+            docker compose up -d --build
+        fi
         echo ""
         echo -e "${GREEN}${BOLD}Voltgres is running!${NC}"
         echo ""
@@ -148,7 +154,11 @@ echo ""
 # Build and start
 echo "Starting Voltgres..."
 echo ""
-docker compose up -d --build
+if [ -n "$domain" ]; then
+    docker compose --profile https up -d --build
+else
+    docker compose up -d --build
+fi
 
 echo ""
 echo -e "${GREEN}${BOLD}Voltgres is running!${NC}"

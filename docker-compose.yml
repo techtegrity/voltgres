@@ -45,9 +45,32 @@ services:
     networks:
       - voltgres-net
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: voltgres-caddy
+    restart: unless-stopped
+    profiles:
+      - https
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN=${DOMAIN}
+    depends_on:
+      - voltgres
+    networks:
+      - voltgres-net
+
 volumes:
   voltgres-data:
   postgres-data:
+  caddy-data:
+  caddy-config:
 
 networks:
   voltgres-net:
