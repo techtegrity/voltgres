@@ -84,7 +84,7 @@ echo ""
 
 if [ -n "$domain" ]; then
     # Detect public IP
-    public_ip=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 icanhazip.com 2>/dev/null || echo "")
+    public_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || curl -4 -s --max-time 5 icanhazip.com 2>/dev/null || echo "")
     if [ -n "$public_ip" ]; then
         echo -e "${YELLOW}${BOLD}DNS Setup Required${NC}"
         echo -e "  Create an ${BOLD}A record${NC} for your domain:"
