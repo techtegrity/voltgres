@@ -585,6 +585,12 @@ export async function importTable(
     progress.phase = "data"
     onProgress({ ...progress })
 
+    // Build column type map for JSON/JSONB handling
+    const colTypeMap = new Map<string, string>()
+    for (const col of tableSchema.columns) {
+      colTypeMap.set(col.name, col.dataType.toLowerCase())
+    }
+
     let offset = 0
     let hasMore = true
     while (hasMore) {
@@ -600,8 +606,22 @@ export async function importTable(
       for (const row of batch.rows) {
         const rowPlaceholders: string[] = []
         for (const col of cols) {
-          rowPlaceholders.push(`$${paramIndex++}`)
-          params.push(row[col])
+          const colType = colTypeMap.get(col) ?? ""
+          const isJson = colType === "json" || colType === "jsonb"
+          const val = row[col]
+
+          if (isJson && val != null && typeof val === "object") {
+            // pg driver parses JSON into JS objects on read; stringify for insert
+            params.push(JSON.stringify(val))
+          } else {
+            params.push(val)
+          }
+
+          if (isJson) {
+            rowPlaceholders.push(`$${paramIndex++}::${colType}`)
+          } else {
+            rowPlaceholders.push(`$${paramIndex++}`)
+          }
         }
         placeholders.push(`(${rowPlaceholders.join(", ")})`)
       }
