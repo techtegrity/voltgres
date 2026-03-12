@@ -1,5 +1,30 @@
 import type { Pool } from "pg"
 
+/**
+ * Safely escape a string literal for embedding in SQL DDL statements
+ * where parameterized queries ($1) are not supported (e.g. CREATE ROLE ... PASSWORD).
+ * Mirrors the pg library's Client.escapeLiteral() implementation.
+ */
+function escapeLiteral(str: string): string {
+  let hasBackslash = false
+  let escaped = "'"
+  for (const c of str) {
+    if (c === "'") {
+      escaped += "''"
+    } else if (c === "\\") {
+      escaped += "\\\\"
+      hasBackslash = true
+    } else {
+      escaped += c
+    }
+  }
+  escaped += "'"
+  if (hasBackslash) {
+    escaped = " E" + escaped
+  }
+  return escaped
+}
+
 export async function listDatabases(pool: Pool) {
   const result = await pool.query(`
     SELECT
@@ -8,9 +33,20 @@ export async function listDatabases(pool: Pool) {
       pg_encoding_to_char(d.encoding) AS encoding,
       pg_database_size(d.datname) AS size_bytes,
       d.datcollate AS collation,
-      (SELECT min(xact_start) FROM pg_stat_activity WHERE datname = d.datname) AS oldest_xact
+      COALESCE(s.numbackends, 0)::int AS active_connections,
+      COALESCE(s.xact_commit, 0)::bigint AS xact_commit,
+      COALESCE(s.xact_rollback, 0)::bigint AS xact_rollback,
+      CASE WHEN COALESCE(s.blks_hit, 0) + COALESCE(s.blks_read, 0) = 0 THEN 0
+           ELSE ROUND(100.0 * s.blks_hit / (s.blks_hit + s.blks_read), 1)
+      END AS cache_hit_ratio,
+      COALESCE(s.tup_returned, 0)::bigint AS tup_returned,
+      COALESCE(s.tup_fetched, 0)::bigint AS tup_fetched,
+      COALESCE(s.tup_inserted, 0)::bigint AS tup_inserted,
+      COALESCE(s.tup_updated, 0)::bigint AS tup_updated,
+      COALESCE(s.tup_deleted, 0)::bigint AS tup_deleted
     FROM pg_database d
     JOIN pg_roles r ON d.datdba = r.oid
+    LEFT JOIN pg_stat_database s ON s.datname = d.datname
     WHERE d.datistemplate = false
     ORDER BY d.datname
   `)
@@ -129,7 +165,7 @@ export async function createPgUser(
   const attrs: string[] = []
   if (canLogin) attrs.push("LOGIN")
   if (superuser) attrs.push("SUPERUSER")
-  attrs.push(`PASSWORD '${password.replace(/'/g, "''")}'`)
+  attrs.push(`PASSWORD ${escapeLiteral(password)}`)
 
   if (attrs.length > 0) {
     sql += ` ${attrs.join(" ")}`
@@ -158,7 +194,7 @@ export async function updatePgUser(
     attrs.push(updates.superuser ? "SUPERUSER" : "NOSUPERUSER")
   }
   if (updates.password) {
-    attrs.push(`PASSWORD '${updates.password.replace(/'/g, "''")}'`)
+    attrs.push(`PASSWORD ${escapeLiteral(updates.password)}`)
   }
 
   if (attrs.length > 0) {

@@ -28,6 +28,15 @@ export interface DatabaseRow {
   encoding: string
   size_bytes: number
   collation: string
+  active_connections: number
+  xact_commit: number
+  xact_rollback: number
+  cache_hit_ratio: number
+  tup_returned: number
+  tup_fetched: number
+  tup_inserted: number
+  tup_updated: number
+  tup_deleted: number
 }
 
 export interface PgUserRow {

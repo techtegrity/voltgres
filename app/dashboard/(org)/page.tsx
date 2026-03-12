@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { ConnectionModal } from "@/components/connection-modal"
+import { DeleteDatabaseDialog } from "@/components/delete-database-dialog"
 import { generatePassword } from "@/lib/generate-password"
 import {
   Database,
@@ -48,6 +49,8 @@ import {
   UserPlus,
   Users,
   CheckCircle2,
+  Activity,
+  Zap,
 } from "lucide-react"
 
 function formatBytes(bytes: number) {
@@ -58,9 +61,16 @@ function formatBytes(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
 }
 
+function formatCompact(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1).replace(/\.0$/, "") + "B"
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M"
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K"
+  return String(n)
+}
+
 export default function DatabasesPage() {
   const router = useRouter()
-  const { databases, loading, addDatabase, deleteDatabase } = useDatabases()
+  const { databases, loading, addDatabase, refresh } = useDatabases()
   const { users, addUser, refresh: refreshUsers } = usePgUsers()
   const { config } = useConnection()
   const [newDbName, setNewDbName] = useState("")
@@ -68,6 +78,7 @@ export default function DatabasesPage() {
   const [newDbEncoding, setNewDbEncoding] = useState("UTF8")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [connectionModalDb, setConnectionModalDb] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ name: string; owner: string } | null>(null)
   const [copiedPassword, setCopiedPassword] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -95,24 +106,22 @@ export default function DatabasesPage() {
     usernameManuallyEdited.current = true
   }
 
+  const resetForm = () => {
+    setNewDbName("")
+    setNewDbOwner("")
+    setNewDbEncoding("UTF8")
+    setCreateNewUser(true)
+    setNewUsername("")
+    setNewUserPassword(generatePassword())
+    usernameManuallyEdited.current = false
+    setCopiedPassword(false)
+    setCreateError(null)
+  }
+
   const handleCreateOpenChange = (open: boolean) => {
     setIsCreateOpen(open)
     if (open) {
-      // Generate a fresh password when modal opens
-      setNewUserPassword(generatePassword())
-      setCreateNewUser(true)
-      setCreateError(null)
-      usernameManuallyEdited.current = false
-    } else {
-      // Reset form on close
-      setNewDbName("")
-      setNewDbOwner("")
-      setNewDbEncoding("UTF8")
-      setCreateNewUser(true)
-      setNewUsername("")
-      setNewUserPassword("")
-      usernameManuallyEdited.current = false
-      setCopiedPassword(false)
+      resetForm()
     }
   }
 
@@ -333,7 +342,7 @@ export default function DatabasesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="bg-card border-border">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -365,12 +374,29 @@ export default function DatabasesPage() {
         <Card className="bg-card border-border">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-chart-4/10">
+                <Zap className="w-5 h-5 text-chart-4" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatCompact(databases.reduce((acc, db) => acc + db.xact_commit + db.xact_rollback, 0))}
+                </p>
+                <p className="text-sm text-muted-foreground">Total Transactions</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
               <div className="p-3 rounded-lg bg-chart-3/10">
                 <Link className="w-5 h-5 text-chart-3" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{users.length}</p>
-                <p className="text-sm text-muted-foreground">Connected Users</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {databases.reduce((acc, db) => acc + db.active_connections, 0)}
+                </p>
+                <p className="text-sm text-muted-foreground">Active Connections</p>
               </div>
             </div>
           </CardContent>
@@ -392,6 +418,15 @@ export default function DatabasesPage() {
         }
       />
 
+      {/* Delete Database Dialog */}
+      <DeleteDatabaseDialog
+        dbName={deleteTarget?.name ?? ""}
+        owner={deleteTarget?.owner ?? null}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        onDeleted={() => { setDeleteTarget(null); refresh() }}
+      />
+
       {/* Database List */}
       <Card className="bg-card border-border">
         <CardHeader>
@@ -408,14 +443,23 @@ export default function DatabasesPage() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                     Name
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden md:table-cell">
                     Owner
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    Encoding
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                     Size
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden sm:table-cell">
+                    Conns
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">
+                    Transactions
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">
+                    Cache Hit
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden xl:table-cell">
+                    Rows R / W
                   </th>
                   <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
                     Actions
@@ -439,14 +483,44 @@ export default function DatabasesPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-muted-foreground">{db.owner}</td>
-                    <td className="py-4 px-4">
-                      <span className="px-2 py-1 text-xs rounded bg-muted text-muted-foreground">
-                        {db.encoding}
-                      </span>
-                    </td>
+                    <td className="py-4 px-4 text-muted-foreground hidden md:table-cell">{db.owner}</td>
                     <td className="py-4 px-4 text-muted-foreground">
                       {formatBytes(db.size_bytes)}
+                    </td>
+                    <td className="py-4 px-4 hidden sm:table-cell">
+                      <span className={`inline-flex items-center gap-1.5 text-sm ${db.active_connections > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                        {db.active_connections > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        )}
+                        {db.active_connections}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-muted-foreground hidden lg:table-cell">
+                      <span title={`${db.xact_commit.toLocaleString()} commits / ${db.xact_rollback.toLocaleString()} rollbacks`}>
+                        {formatCompact(db.xact_commit + db.xact_rollback)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 hidden lg:table-cell">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              Number(db.cache_hit_ratio) >= 95 ? "bg-green-500" :
+                              Number(db.cache_hit_ratio) >= 80 ? "bg-yellow-500" :
+                              "bg-red-500"
+                            }`}
+                            style={{ width: `${Math.min(Number(db.cache_hit_ratio), 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {Number(db.cache_hit_ratio)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-muted-foreground hidden xl:table-cell">
+                      <span title={`Returned: ${db.tup_returned.toLocaleString()} / Fetched: ${db.tup_fetched.toLocaleString()} | Inserted: ${db.tup_inserted.toLocaleString()} / Updated: ${db.tup_updated.toLocaleString()} / Deleted: ${db.tup_deleted.toLocaleString()}`}>
+                        {formatCompact(db.tup_fetched)} / {formatCompact(db.tup_inserted + db.tup_updated + db.tup_deleted)}
+                      </span>
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -477,7 +551,7 @@ export default function DatabasesPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => deleteDatabase(db.name)}
+                              onClick={() => setDeleteTarget({ name: db.name, owner: db.owner })}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete Database
