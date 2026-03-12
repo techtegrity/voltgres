@@ -268,6 +268,40 @@ export const api = {
       }),
   },
 
+  import: {
+    testConnection: (data: {
+      host: string
+      port: number
+      user: string
+      password: string
+      database: string
+      ssl?: boolean
+    }) =>
+      apiFetch<{
+        success: boolean
+        version?: string
+        database?: string
+        error?: string
+      }>("/api/pg/import/test-connection", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    listTables: (data: {
+      host: string
+      port: number
+      user: string
+      password: string
+      database: string
+      ssl?: boolean
+    }) =>
+      apiFetch<
+        { schema: string; name: string; rowCount: number; sizeBytes: number }[]
+      >("/api/pg/import/tables", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
   snapshots: {
     list: (db?: string) =>
       apiFetch<SnapshotData[]>(

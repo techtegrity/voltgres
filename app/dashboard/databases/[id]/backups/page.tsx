@@ -29,6 +29,13 @@ import {
 } from "@/components/ui/select"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ImportDatabaseDialog } from "@/components/import-database-dialog"
+import {
   HardDrive,
   Plus,
   Calendar,
@@ -43,6 +50,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Settings,
+  MoreVertical,
+  Import,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -58,6 +67,7 @@ export default function DatabaseBackupsPage({
   const { config: storageConfig, loading: storageLoading } = useStorageConfig()
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [newBackupName, setNewBackupName] = useState("")
   const [newBackupSchedule, setNewBackupSchedule] = useState("daily")
   const [creating, setCreating] = useState(false)
@@ -157,11 +167,12 @@ export default function DatabaseBackupsPage({
             Manage backups for {dbName}
           </p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Schedule
+        <div className="flex items-center gap-2">
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Schedule
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border max-w-md">
@@ -212,8 +223,29 @@ export default function DatabaseBackupsPage({
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsImportOpen(true)} className="gap-2">
+                <Import className="w-4 h-4" />
+                Import Database
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      <ImportDatabaseDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        targetDatabase={dbName}
+      />
 
       {/* Storage not configured warning */}
       {!storageLoading && !storageConfigured && (
