@@ -361,7 +361,11 @@ export async function getEnumTypes(
   return result.rows.map((r) => ({
     typeName: r.type_name,
     schemaName: r.schema_name,
-    labels: r.labels,
+    labels: Array.isArray(r.labels)
+      ? r.labels
+      : typeof r.labels === "string"
+        ? r.labels.replace(/^\{|\}$/g, "").split(",")
+        : [],
   }))
 }
 
