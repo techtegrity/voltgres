@@ -47,6 +47,9 @@ if [ "$STASHED" = true ]; then
     git stash pop || echo -e "${YELLOW}Warning: Could not restore stashed changes. Run 'git stash pop' manually.${NC}"
 fi
 
+# Ensure entrypoint script is executable
+chmod +x pg-entrypoint.sh
+
 # Rebuild and restart
 echo "Rebuilding and restarting..."
 existing_domain=$(grep '^DOMAIN=' .env | cut -d= -f2-)

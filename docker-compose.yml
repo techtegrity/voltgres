@@ -33,14 +33,19 @@ services:
     image: postgres:16-alpine
     container_name: voltgres-postgres
     restart: unless-stopped
+    entrypoint: ["/pg-entrypoint.sh"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - DOMAIN=${DOMAIN:-}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - postgres-ssl:/var/lib/postgresql/ssl
+      - caddy-data:/caddy-data:ro
+      - ./pg-entrypoint.sh:/pg-entrypoint.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -74,6 +79,7 @@ services:
 volumes:
   voltgres-data:
   postgres-data:
+  postgres-ssl:
   caddy-data:
   caddy-config:
 

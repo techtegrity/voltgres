@@ -201,6 +201,9 @@ EOF
 echo -e "${GREEN}.env created successfully.${NC}"
 echo ""
 
+# Ensure entrypoint script is executable
+chmod +x pg-entrypoint.sh
+
 # Build and start
 echo "Starting Voltgres..."
 echo ""
@@ -222,4 +225,11 @@ echo -e "    User:     ${BOLD}postgres${NC}"
 echo -e "    Password: ${BOLD}${pg_pass}${NC}"
 echo ""
 echo -e "  ${YELLOW}Save these credentials somewhere safe.${NC}"
+echo ""
+if [ -n "$domain" ]; then
+    echo -e "  ${GREEN}SSL is auto-configured using Let's Encrypt via Caddy.${NC}"
+else
+    echo -e "  SSL uses a self-signed certificate."
+    echo -e "  External clients need ${CYAN}sslmode=no-verify${NC} or ${CYAN}sslmode=require${NC} with driver config."
+fi
 echo ""
