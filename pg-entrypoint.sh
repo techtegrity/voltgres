@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# Install openssl if not available (postgres:16-alpine doesn't include it)
+if ! command -v openssl >/dev/null 2>&1; then
+    apk add --no-cache openssl >/dev/null 2>&1
+fi
+
 SSL_DIR="/var/lib/postgresql/ssl"
 CADDY_CERT_BASE="/caddy-data/certificates/acme-v02.api.letsencrypt.org-directory"
 
