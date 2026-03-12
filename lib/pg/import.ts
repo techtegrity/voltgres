@@ -361,11 +361,7 @@ export async function getEnumTypes(
   return result.rows.map((r) => ({
     typeName: r.type_name,
     schemaName: r.schema_name,
-    labels: Array.isArray(r.labels)
-      ? r.labels
-      : typeof r.labels === "string"
-        ? r.labels.replace(/^\{|\}$/g, "").split(",")
-        : [],
+    labels: toStringArray(r.labels),
   }))
 }
 
@@ -562,7 +558,8 @@ export async function importTable(
     // 2. Create enum types
     const enums = await getEnumTypes(source, table.schema, table.name)
     for (const e of enums) {
-      const labels = e.labels.map((l) => `'${l.replace(/'/g, "''")}'`).join(", ")
+      const safeLabels = toStringArray(e.labels)
+      const labels = safeLabels.map((l) => `'${l.replace(/'/g, "''")}'`).join(", ")
       await target.query(
         `DO $$ BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '${e.typeName}') THEN
