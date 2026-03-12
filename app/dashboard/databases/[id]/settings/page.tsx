@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { useDatabases } from "@/hooks/use-databases"
+import { usePgUsers } from "@/hooks/use-pg-users"
 import { api, type DatabaseRow } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +19,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { Settings, Trash2, AlertTriangle } from "lucide-react"
+import { Settings, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 
 export default function DatabaseSettingsPage({
   params,
@@ -29,9 +30,13 @@ export default function DatabaseSettingsPage({
   const dbName = decodeURIComponent(id)
   const router = useRouter()
   const { deleteDatabase } = useDatabases()
+  const { deleteUser } = usePgUsers()
 
   const [confirmDelete, setConfirmDelete] = useState("")
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteUser, setShowDeleteUser] = useState(false)
+  const [deletingUser, setDeletingUser] = useState(false)
   const [dbInfo, setDbInfo] = useState<DatabaseRow | null>(null)
 
   useEffect(() => {
@@ -39,10 +44,34 @@ export default function DatabaseSettingsPage({
   }, [dbName])
 
   const handleDelete = async () => {
-    if (confirmDelete === dbName) {
+    if (confirmDelete !== dbName) return
+    setDeleting(true)
+    try {
       await deleteDatabase(dbName)
-      router.push("/dashboard")
+      setIsDeleteOpen(false)
+      if (dbInfo?.owner) {
+        setShowDeleteUser(true)
+      } else {
+        router.push("/dashboard")
+      }
+    } catch {
+      setDeleting(false)
     }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!dbInfo?.owner) return
+    setDeletingUser(true)
+    try {
+      await deleteUser(dbInfo.owner)
+    } catch {
+      // user deletion is best-effort
+    }
+    router.push("/dashboard")
+  }
+
+  const handleSkipDeleteUser = () => {
+    router.push("/dashboard")
   }
 
   return (
@@ -143,14 +172,15 @@ export default function DatabaseSettingsPage({
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" disabled={deleting}>Cancel</Button>
                   </DialogClose>
                   <Button
                     variant="destructive"
                     onClick={handleDelete}
-                    disabled={confirmDelete !== dbName}
+                    disabled={confirmDelete !== dbName || deleting}
                   >
-                    Delete Database
+                    {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {deleting ? "Deleting..." : "Delete Database"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -158,6 +188,35 @@ export default function DatabaseSettingsPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Owner User Dialog */}
+      <Dialog open={showDeleteUser} onOpenChange={(open) => {
+        if (!open) handleSkipDeleteUser()
+      }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Owner Role?</DialogTitle>
+            <DialogDescription>
+              The database <span className="font-mono font-medium text-foreground">{dbName}</span> was
+              owned by role <span className="font-mono font-medium text-foreground">{dbInfo?.owner}</span>.
+              Would you like to delete this role as well?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleSkipDeleteUser} disabled={deletingUser}>
+              No, Keep Role
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+            >
+              {deletingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {deletingUser ? "Deleting..." : "Delete Role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
