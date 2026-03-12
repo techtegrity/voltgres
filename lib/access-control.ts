@@ -13,14 +13,19 @@ async function getEnabledRules() {
   const now = Date.now()
   if (cachedRules && now - cacheTime < CACHE_TTL) return cachedRules
 
-  const rules = await db
-    .select({ type: accessRule.type, value: accessRule.value })
-    .from(accessRule)
-    .where(eq(accessRule.enabled, true))
+  try {
+    const rules = await db
+      .select({ type: accessRule.type, value: accessRule.value })
+      .from(accessRule)
+      .where(eq(accessRule.enabled, true))
 
-  cachedRules = rules
-  cacheTime = now
-  return rules
+    cachedRules = rules
+    cacheTime = now
+    return rules
+  } catch {
+    // Table may not exist yet (pre-migration) — allow all access
+    return []
+  }
 }
 
 export function invalidateAccessRuleCache() {
