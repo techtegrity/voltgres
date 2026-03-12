@@ -54,6 +54,9 @@ export async function createDatabase(
   // PG 15+ revoked default CREATE on public schema — grant full access to the
   // owner so they (and apps connecting as them) can create schemas, run
   // migrations, etc. without hitting "permission denied for schema" errors.
+  // Also grant CREATE ON DATABASE so the owner can create new schemas (e.g.
+  // Drizzle's "drizzle" migration-tracking schema).
+  await pool.query(`GRANT CREATE ON DATABASE "${safeName}" TO "${safeOwner}"`)
   const dbPool = await getDbPool(pool, safeName)
   try {
     await dbPool.query(`GRANT ALL ON SCHEMA public TO "${safeOwner}"`)
@@ -191,7 +194,7 @@ export async function grantAccess(
   const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, "_")
 
   // Grant full database-level privileges so the user can run migrations,
-  // create schemas, tables, etc. — not just CONNECT.
+  // create schemas (e.g. Drizzle's "drizzle" schema), tables, etc.
   await pool.query(`GRANT ALL PRIVILEGES ON DATABASE "${safeDbName}" TO "${safeUsername}"`)
 
   // Also grant usage + create on public schema (PG 15+ revoked public CREATE by default)
