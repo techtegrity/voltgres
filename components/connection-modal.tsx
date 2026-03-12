@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -96,6 +96,7 @@ export function ConnectionModal({
 }: ConnectionModalProps) {
   const [selectedDb, setSelectedDb] = useState(initialDatabase || "")
   const [selectedUser, setSelectedUser] = useState(initialUser || "")
+  const userManuallySelected = useRef(false)
   const [format, setFormat] = useState<ConnectionFormat>("uri")
   const [showPassword, setShowPassword] = useState(false)
   const [sslEnabled, setSslEnabled] = useState(false)
@@ -130,6 +131,7 @@ export function ConnectionModal({
         // Will be resolved by the auto-select effect once filteredUsers updates
         setSelectedUser("")
       }
+      userManuallySelected.current = false
       setTempPassword(null)
       setResetSuccess(false)
       setShowPassword(false)
@@ -146,31 +148,34 @@ export function ConnectionModal({
   }, [users, selectedDb])
 
   // Pick the best default role for a database:
-  // prefer a non-superuser with explicit access, then the DB owner, then first available
+  // prefer the DB owner, then a non-superuser with explicit access, then first available
   const bestDefaultUser = useMemo(() => {
     if (filteredUsers.length === 0) return ""
     const db = databases.find((d) => d.name === selectedDb)
-    // Prefer the dedicated (non-superuser) role that has this DB in its list
-    const dedicated = filteredUsers.find(
-      (u) => !u.superuser && u.databases.includes(selectedDb)
-    )
-    if (dedicated) return dedicated.username
-    // Fall back to the DB owner
+    // Prefer the DB owner (the role used during creation)
     if (db?.owner) {
       const ownerUser = filteredUsers.find((u) => u.username === db.owner)
       if (ownerUser) return ownerUser.username
     }
+    // Fall back to a dedicated (non-superuser) role with access
+    const dedicated = filteredUsers.find(
+      (u) => !u.superuser && u.databases.includes(selectedDb)
+    )
+    if (dedicated) return dedicated.username
     return filteredUsers[0].username
   }, [filteredUsers, selectedDb, databases])
 
-  // Auto-select best user when database changes or current user isn't in the filtered list
+  // Auto-select best user when database changes, bestDefaultUser resolves, or
+  // current user isn't in the filtered list. Respects manual selection.
   useEffect(() => {
-    if (filteredUsers.length > 0 && !filteredUsers.find((u) => u.username === selectedUser)) {
+    if (filteredUsers.length === 0) return
+    const currentInList = filteredUsers.some((u) => u.username === selectedUser)
+    if (!currentInList || !userManuallySelected.current) {
       setSelectedUser(bestDefaultUser)
     }
     setTempPassword(null)
     setResetSuccess(false)
-  }, [selectedDb, filteredUsers, selectedUser, bestDefaultUser])
+  }, [selectedDb, bestDefaultUser, filteredUsers])
 
   // Determine the password to display
   const currentPassword = useMemo(() => {
@@ -262,7 +267,10 @@ export function ConnectionModal({
               <Database className="w-3.5 h-3.5" />
               Database
             </FieldLabel>
-            <Select value={selectedDb} onValueChange={setSelectedDb}>
+            <Select value={selectedDb} onValueChange={(val) => {
+              setSelectedDb(val)
+              userManuallySelected.current = false
+            }}>
               <SelectTrigger className="bg-input border-border">
                 <SelectValue placeholder="Select database" />
               </SelectTrigger>
@@ -311,6 +319,7 @@ export function ConnectionModal({
             </div>
             <Select value={selectedUser} onValueChange={(val) => {
               setSelectedUser(val)
+              userManuallySelected.current = true
               setTempPassword(null)
               setResetSuccess(false)
             }}>
