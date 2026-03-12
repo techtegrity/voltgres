@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/auth-server"
 import { db } from "@/lib/db"
 import { backupConfig } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm"
+import { reloadSchedule } from "@/lib/snapshots/scheduler"
 
 export async function PUT(
   request: NextRequest,
@@ -32,6 +33,10 @@ export async function PUT(
         and(eq(backupConfig.id, id), eq(backupConfig.userId, session.user.id))
       )
 
+    reloadSchedule(id).catch((err) => {
+      console.error("[backups] Failed to reload schedule:", err)
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
@@ -52,6 +57,10 @@ export async function DELETE(
       .where(
         and(eq(backupConfig.id, id), eq(backupConfig.userId, session.user.id))
       )
+
+    reloadSchedule(id).catch((err) => {
+      console.error("[backups] Failed to reload schedule:", err)
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

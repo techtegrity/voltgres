@@ -2,6 +2,9 @@
 
 import { useState, use } from "react"
 import { useBackups } from "@/hooks/use-backups"
+import { useSnapshots } from "@/hooks/use-snapshots"
+import { useStorageConfig } from "@/hooks/use-storage-config"
+import { api } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,23 +31,20 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import {
   HardDrive,
   Plus,
-  Clock,
   Calendar,
   Download,
   Trash2,
   RefreshCw,
-  Zap,
   Cloud,
   History,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  RotateCcw,
+  Settings,
 } from "lucide-react"
-
-interface Snapshot {
-  id: string
-  name: string
-  createdAt: Date
-  size: string
-  expiresAt: Date
-}
+import Link from "next/link"
 
 export default function DatabaseBackupsPage({
   params,
@@ -54,30 +54,17 @@ export default function DatabaseBackupsPage({
   const { id } = use(params)
   const dbName = decodeURIComponent(id)
   const { backups, addBackup, updateBackup, deleteBackup } = useBackups(dbName)
+  const { snapshots, loading: snapshotsLoading, createSnapshot, deleteSnapshot } = useSnapshots(dbName)
+  const { config: storageConfig, loading: storageLoading } = useStorageConfig()
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newBackupName, setNewBackupName] = useState("")
-  const [newBackupType, setNewBackupType] = useState<"s3" | "gcs" | "local">("s3")
   const [newBackupSchedule, setNewBackupSchedule] = useState("daily")
-  const [newBackupDestination, setNewBackupDestination] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [restoreDialogId, setRestoreDialogId] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState(false)
 
-  // Mock snapshots (visual placeholders for now)
-  const [snapshots] = useState<Snapshot[]>([
-    {
-      id: "1",
-      name: `snapshot_${new Date().toISOString().split("T")[0]}T00:00:09Z`,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      size: "45.2 MB",
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
-    {
-      id: "2",
-      name: `snapshot_${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}T00:00:11Z`,
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      size: "42.8 MB",
-      expiresAt: new Date(Date.now() + 23 * 24 * 60 * 60 * 1000),
-    },
-  ])
+  const storageConfigured = !storageLoading && storageConfig !== null
 
   const scheduleOptions: Record<string, string> = {
     hourly: "0 * * * *",
@@ -86,20 +73,51 @@ export default function DatabaseBackupsPage({
     monthly: "0 2 1 * *",
   }
 
-  const handleCreate = () => {
-    if (newBackupName && newBackupDestination) {
+  const handleCreateSchedule = () => {
+    if (newBackupName) {
       addBackup({
         name: newBackupName,
-        type: newBackupType,
+        type: "s3",
         schedule: scheduleOptions[newBackupSchedule],
         enabled: true,
         databases: [dbName],
-        destination: newBackupDestination,
+        destination: "",
       })
       setNewBackupName("")
-      setNewBackupDestination("")
       setIsCreateOpen(false)
     }
+  }
+
+  const handleCreateSnapshot = async () => {
+    setCreating(true)
+    try {
+      await createSnapshot(dbName)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRunNow = async () => {
+    setCreating(true)
+    try {
+      await createSnapshot(dbName)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRestore = async (snapshotId: string) => {
+    setRestoring(true)
+    try {
+      await api.snapshots.restore(snapshotId)
+      setRestoreDialogId(null)
+    } finally {
+      setRestoring(false)
+    }
+  }
+
+  const handleDelete = async (snapshotId: string) => {
+    await deleteSnapshot(snapshotId)
   }
 
   const formatSchedule = (cron: string) => {
@@ -108,6 +126,25 @@ export default function DatabaseBackupsPage({
     if (cron === "0 2 * * 0") return "Weekly on Sunday"
     if (cron === "0 2 1 * *") return "Monthly on 1st"
     return cron
+  }
+
+  const formatBytes = (bytes: number | null) => {
+    if (!bytes) return "—"
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—"
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
   }
 
   return (
@@ -146,19 +183,6 @@ export default function DatabaseBackupsPage({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="backup-type">Destination Type</FieldLabel>
-                <Select value={newBackupType} onValueChange={(v) => setNewBackupType(v as typeof newBackupType)}>
-                  <SelectTrigger className="bg-input border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="s3">Amazon S3</SelectItem>
-                    <SelectItem value="gcs">Google Cloud Storage</SelectItem>
-                    <SelectItem value="local">Local Storage</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
                 <FieldLabel htmlFor="backup-schedule">Frequency</FieldLabel>
                 <Select value={newBackupSchedule} onValueChange={setNewBackupSchedule}>
                   <SelectTrigger className="bg-input border-border">
@@ -172,22 +196,18 @@ export default function DatabaseBackupsPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field>
-                <FieldLabel htmlFor="backup-destination">Destination Path</FieldLabel>
-                <Input
-                  id="backup-destination"
-                  value={newBackupDestination}
-                  onChange={(e) => setNewBackupDestination(e.target.value)}
-                  placeholder={newBackupType === "s3" ? "s3://bucket/path" : newBackupType === "gcs" ? "gs://bucket/path" : "/var/backups"}
-                  className="bg-input border-border font-mono text-sm"
-                />
-              </Field>
             </FieldGroup>
+            {!storageConfigured && (
+              <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" />
+                Storage must be configured in Settings before snapshots can run.
+              </p>
+            )}
             <DialogFooter>
               <DialogClose asChild>
                 <Button variant="outline">Cancel</Button>
               </DialogClose>
-              <Button onClick={handleCreate} disabled={!newBackupName || !newBackupDestination}>
+              <Button onClick={handleCreateSchedule} disabled={!newBackupName}>
                 Create Schedule
               </Button>
             </DialogFooter>
@@ -195,38 +215,30 @@ export default function DatabaseBackupsPage({
         </Dialog>
       </div>
 
-      {/* Point-in-time Restore */}
-      <Card className="bg-card border-border mb-6">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Zap className="w-5 h-5 text-primary" />
+      {/* Storage not configured warning */}
+      {!storageLoading && !storageConfigured && (
+        <Card className="bg-amber-500/5 border-amber-500/20 mb-6">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Snapshot storage not configured
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Configure S3 or Cloudflare R2 storage in Settings to create and manage snapshots.
+                </p>
+              </div>
+              <Link href="/dashboard/settings">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </Button>
+              </Link>
             </div>
-            <div>
-              <CardTitle className="text-base">Instant point-in-time restore</CardTitle>
-              <CardDescription>
-                Instantly restore this database to any point in the past 6 hours
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <Field className="flex-1 min-w-[200px]">
-              <FieldLabel>Point in time</FieldLabel>
-              <Input
-                type="datetime-local"
-                className="bg-input border-border"
-                defaultValue={new Date().toISOString().slice(0, 16)}
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button variant="outline">Preview data</Button>
-              <Button>Restore to point in time</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Backup Schedules */}
       <Card className="bg-card border-border mb-6">
@@ -260,7 +272,10 @@ export default function DatabaseBackupsPage({
                     <div>
                       <p className="font-medium text-foreground">{config.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatSchedule(config.schedule)} &bull; {config.type.toUpperCase()}
+                        {formatSchedule(config.schedule)}
+                        {config.lastRun && (
+                          <> &bull; Last run: {new Date(config.lastRun).toLocaleDateString()}</>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -274,7 +289,13 @@ export default function DatabaseBackupsPage({
                         {config.enabled ? "Enabled" : "Disabled"}
                       </span>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={creating || !storageConfigured}
+                      onClick={handleRunNow}
+                    >
                       <RefreshCw className="w-3 h-3" />
                       Run now
                     </Button>
@@ -315,45 +336,159 @@ export default function DatabaseBackupsPage({
                 </CardDescription>
               </div>
             </div>
-            <Button variant="outline" className="gap-2">
-              <HardDrive className="w-4 h-4" />
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={creating || !storageConfigured}
+              onClick={handleCreateSnapshot}
+            >
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <HardDrive className="w-4 h-4" />
+              )}
               Create snapshot
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {snapshots.map((snapshot) => (
-              <div
-                key={snapshot.id}
-                className="flex items-center justify-between p-4 rounded-lg border border-border"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <div>
-                    <p className="font-mono text-sm text-foreground">{snapshot.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {snapshot.createdAt.toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })} &bull; {snapshot.size} &bull; Expires {snapshot.expiresAt.toLocaleDateString()}
-                    </p>
+          {snapshotsLoading ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : snapshots.length > 0 ? (
+            <div className="space-y-3">
+              {snapshots.map((snap) => (
+                <div
+                  key={snap.id}
+                  className="flex items-center justify-between p-4 rounded-lg border border-border"
+                >
+                  <div className="flex items-center gap-4">
+                    <SnapshotStatusDot status={snap.status} />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-sm text-foreground">
+                          {snap.database}
+                        </p>
+                        <Badge
+                          variant={snap.trigger === "scheduled" ? "secondary" : "outline"}
+                          className="text-xs"
+                        >
+                          {snap.trigger}
+                        </Badge>
+                        <SnapshotStatusBadge status={snap.status} />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatDate(snap.createdAt)}
+                        {snap.sizeBytes != null && <> &bull; {formatBytes(snap.sizeBytes)}</>}
+                        {snap.error && (
+                          <span className="text-destructive"> &bull; {snap.error}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {snap.status === "completed" && (
+                      <>
+                        <a
+                          href={api.snapshots.downloadUrl(snap.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <Download className="w-3 h-3" />
+                            Download
+                          </Button>
+                        </a>
+                        <Dialog
+                          open={restoreDialogId === snap.id}
+                          onOpenChange={(open) => setRestoreDialogId(open ? snap.id : null)}
+                        >
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <RotateCcw className="w-3 h-3" />
+                              Restore
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-card border-border max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Restore Snapshot</DialogTitle>
+                              <DialogDescription>
+                                This will restore the snapshot to database &quot;{snap.database}&quot;.
+                                Existing data will be overwritten.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                              <DialogClose asChild>
+                                <Button variant="outline">Cancel</Button>
+                              </DialogClose>
+                              <Button
+                                variant="destructive"
+                                disabled={restoring}
+                                onClick={() => handleRestore(snap.id)}
+                                className="gap-2"
+                              >
+                                {restoring && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Restore
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </>
+                    )}
+                    {(snap.status === "completed" || snap.status === "failed") && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(snap.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Download className="w-3 h-3" />
-                    Restore
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <History className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p>No snapshots yet</p>
+              <p className="text-sm mt-1">
+                {storageConfigured
+                  ? "Create a snapshot to back up this database"
+                  : "Configure storage in Settings to get started"}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   )
+}
+
+function SnapshotStatusDot({ status }: { status: string }) {
+  if (status === "pending" || status === "running") {
+    return <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+  }
+  if (status === "completed") {
+    return <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+  }
+  if (status === "failed") {
+    return <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+  }
+  return <div className="w-2 h-2 rounded-full bg-muted-foreground shrink-0" />
+}
+
+function SnapshotStatusBadge({ status }: { status: string }) {
+  if (status === "pending") {
+    return <Badge variant="secondary" className="text-xs">Pending</Badge>
+  }
+  if (status === "running") {
+    return <Badge variant="secondary" className="text-xs">Running</Badge>
+  }
+  if (status === "failed") {
+    return <Badge variant="destructive" className="text-xs">Failed</Badge>
+  }
+  return null
 }

@@ -223,7 +223,7 @@ export default function LoginPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full gap-2"
+                      className="w-full gap-2 text-foreground hover:text-foreground"
                       onClick={handleGoogleSignIn}
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">

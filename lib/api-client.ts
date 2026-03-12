@@ -94,6 +94,32 @@ export interface PublicConnectionInfo {
   publicPort: number
 }
 
+export interface StorageConfigData {
+  id: string
+  provider: "s3" | "r2"
+  bucket: string
+  region: string
+  endpoint: string | null
+  accessKeyId: string
+  secretAccessKey: string
+  pathPrefix: string
+}
+
+export interface SnapshotData {
+  id: string
+  database: string
+  status: "pending" | "running" | "completed" | "failed"
+  sizeBytes: number | null
+  storageKey: string | null
+  error: string | null
+  trigger: "manual" | "scheduled"
+  backupConfigId: string | null
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string
+  userId: string
+}
+
 export const api = {
   databases: {
     list: () => apiFetch<DatabaseRow[]>("/api/pg/databases"),
@@ -207,5 +233,64 @@ export const api = {
 
   server: {
     info: () => apiFetch<ServerInfo>("/api/pg/server-info"),
+  },
+
+  storage: {
+    get: () => apiFetch<StorageConfigData | null>("/api/config/storage"),
+    save: (data: {
+      provider: string
+      bucket: string
+      region?: string
+      endpoint?: string
+      accessKeyId: string
+      secretAccessKey: string
+      pathPrefix?: string
+    }) =>
+      apiFetch<{ success: boolean }>("/api/config/storage", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    test: (data: {
+      provider: string
+      bucket: string
+      region?: string
+      endpoint?: string
+      accessKeyId: string
+      secretAccessKey: string
+    }) =>
+      apiFetch<{ success: boolean; error?: string }>(
+        "/api/config/storage/test",
+        { method: "POST", body: JSON.stringify(data) }
+      ),
+    delete: () =>
+      apiFetch<{ success: boolean }>("/api/config/storage", {
+        method: "DELETE",
+      }),
+  },
+
+  snapshots: {
+    list: (db?: string) =>
+      apiFetch<SnapshotData[]>(
+        db
+          ? `/api/snapshots?db=${encodeURIComponent(db)}`
+          : "/api/snapshots"
+      ),
+    create: (database: string) =>
+      apiFetch<{ id: string; status: string }>("/api/snapshots", {
+        method: "POST",
+        body: JSON.stringify({ database }),
+      }),
+    get: (id: string) => apiFetch<SnapshotData>(`/api/snapshots/${id}`),
+    delete: (id: string) =>
+      apiFetch(`/api/snapshots/${id}`, { method: "DELETE" }),
+    downloadUrl: (id: string) => `/api/snapshots/${id}/download`,
+    restore: (id: string, targetDatabase?: string) =>
+      apiFetch<{ success: boolean; message: string }>(
+        `/api/snapshots/${id}/restore`,
+        {
+          method: "POST",
+          body: JSON.stringify({ targetDatabase }),
+        }
+      ),
   },
 }

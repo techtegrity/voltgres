@@ -97,3 +97,39 @@ export const backupConfig = sqliteTable("backup_config", {
     .notNull()
     .references(() => user.id),
 })
+
+export const storageConfig = sqliteTable("storage_config", {
+  id: text("id").primaryKey(),
+  provider: text("provider", { enum: ["s3", "r2"] }).notNull(),
+  bucket: text("bucket").notNull(),
+  region: text("region").notNull().default("us-east-1"),
+  endpoint: text("endpoint"),
+  accessKeyId: text("access_key_id").notNull(),
+  secretAccessKey: text("secret_access_key").notNull(),
+  pathPrefix: text("path_prefix").default(""),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+})
+
+export const snapshot = sqliteTable("snapshot", {
+  id: text("id").primaryKey(),
+  database: text("database").notNull(),
+  status: text("status", {
+    enum: ["pending", "running", "completed", "failed"],
+  })
+    .notNull()
+    .default("pending"),
+  sizeBytes: integer("size_bytes"),
+  storageKey: text("storage_key"),
+  error: text("error"),
+  trigger: text("trigger", { enum: ["manual", "scheduled"] })
+    .notNull()
+    .default("manual"),
+  backupConfigId: text("backup_config_id"),
+  startedAt: integer("started_at", { mode: "timestamp" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+})

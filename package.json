@@ -14,6 +14,8 @@
     "docker:fresh": "docker compose down -v && docker compose up -d --build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1007.0",
+    "@aws-sdk/s3-request-presigner": "^3.1007.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
@@ -55,6 +57,7 @@
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "node-cron": "^4.2.1",
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
@@ -77,6 +80,7 @@
     "@tailwindcss/postcss": "^4.2.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25",
+    "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.18.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "19.2.14",

@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/auth-server"
 import { db } from "@/lib/db"
 import { backupConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { reloadSchedule } from "@/lib/snapshots/scheduler"
 
 export async function GET() {
   const session = await getServerSession()
@@ -29,9 +30,9 @@ export async function POST(request: NextRequest) {
     const { name, type, schedule, enabled, databases, destination } =
       await request.json()
 
-    if (!name || !type || !schedule || !destination) {
+    if (!name || !schedule) {
       return NextResponse.json(
-        { error: "name, type, schedule, and destination are required" },
+        { error: "name and schedule are required" },
         { status: 400 }
       )
     }
@@ -42,14 +43,19 @@ export async function POST(request: NextRequest) {
     await db.insert(backupConfig).values({
       id,
       name,
-      type,
+      type: type || "s3",
       schedule,
       enabled: enabled !== false,
       databases: JSON.stringify(databases || []),
-      destination,
+      destination: destination || "",
       createdAt: now,
       updatedAt: now,
       userId: session.user.id,
+    })
+
+    // Reload scheduler for this new config
+    reloadSchedule(id).catch((err) => {
+      console.error("[backups] Failed to reload schedule:", err)
     })
 
     return NextResponse.json({ id, success: true })
