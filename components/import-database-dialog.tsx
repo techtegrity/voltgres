@@ -30,6 +30,8 @@ import {
   Database,
   AlertTriangle,
   Search,
+  Link,
+  Settings2,
 } from "lucide-react"
 
 interface ConnectionConfig {
@@ -40,6 +42,44 @@ interface ConnectionConfig {
   database: string
   ssl: boolean
 }
+
+type ConnectionInputMode = "string" | "fields"
+
+function parseConnectionString(str: string): Partial<ConnectionConfig> {
+  const s = str.trim()
+  if (!s) return {}
+
+  try {
+    const url = new URL(s.startsWith("postgres") ? s : `postgresql://${s}`)
+    return {
+      host: url.hostname || undefined,
+      port: url.port ? parseInt(url.port, 10) : 5432,
+      user: url.username ? decodeURIComponent(url.username) : undefined,
+      password: url.password ? decodeURIComponent(url.password) : undefined,
+      database: url.pathname.replace(/^\//, "") || undefined,
+      ssl: url.searchParams.get("sslmode") === "require" ||
+        url.searchParams.get("ssl") === "true" ||
+        url.searchParams.get("sslmode") === "verify-full" ||
+        url.searchParams.get("sslmode") === "verify-ca",
+    }
+  } catch {
+    // Try key=value format: host=... port=... user=... password=... dbname=...
+    const parts: Record<string, string> = {}
+    for (const match of s.matchAll(/(\w+)\s*=\s*(?:'([^']*)'|(\S+))/g)) {
+      parts[match[1]] = match[2] ?? match[3]
+    }
+    if (Object.keys(parts).length === 0) return {}
+    return {
+      host: parts.host || parts.hostname,
+      port: parts.port ? parseInt(parts.port, 10) : 5432,
+      user: parts.user || parts.username,
+      password: parts.password,
+      database: parts.dbname || parts.database,
+      ssl: parts.sslmode === "require" || parts.sslmode === "verify-full" || parts.sslmode === "verify-ca",
+    }
+  }
+}
+
 
 interface ExternalTable {
   schema: string
@@ -87,6 +127,8 @@ export function ImportDatabaseDialog({
   const [step, setStep] = useState(1)
 
   // Step 1: Connection
+  const [inputMode, setInputMode] = useState<ConnectionInputMode>("string")
+  const [connectionString, setConnectionString] = useState("")
   const [conn, setConn] = useState<ConnectionConfig>({
     host: "",
     port: 5432,
@@ -124,6 +166,8 @@ export function ImportDatabaseDialog({
 
   const reset = useCallback(() => {
     setStep(1)
+    setInputMode("string")
+    setConnectionString("")
     setConn({ host: "", port: 5432, user: "postgres", password: "", database: "", ssl: false })
     setTestStatus("idle")
     setTestMessage("")
@@ -153,12 +197,34 @@ export function ImportDatabaseDialog({
     [onOpenChange, reset]
   )
 
+  // Resolve connection config from either input mode
+  const getResolvedConnection = useCallback((): ConnectionConfig => {
+    if (inputMode === "string") {
+      const parsed = parseConnectionString(connectionString)
+      return {
+        host: parsed.host || "",
+        port: parsed.port || 5432,
+        user: parsed.user || "postgres",
+        password: parsed.password || "",
+        database: parsed.database || "",
+        ssl: parsed.ssl || false,
+      }
+    }
+    return conn
+  }, [inputMode, connectionString, conn])
+
+  const isConnectionValid = useCallback((): boolean => {
+    const c = getResolvedConnection()
+    return !!(c.host && c.database && c.user)
+  }, [getResolvedConnection])
+
   // Step 1: Test connection
   const handleTestConnection = async () => {
     setTestStatus("testing")
     setTestMessage("")
     try {
-      const result = await api.import.testConnection(conn)
+      const resolved = getResolvedConnection()
+      const result = await api.import.testConnection(resolved)
       if (result.success) {
         setTestStatus("success")
         setTestMessage(result.version || "Connected successfully")
@@ -177,7 +243,10 @@ export function ImportDatabaseDialog({
     setTablesLoading(true)
     setTablesError("")
     try {
-      const result = await api.import.listTables(conn)
+      const resolved = getResolvedConnection()
+      const result = await api.import.listTables(resolved)
+      // Sync conn state so step 4 import uses the resolved values
+      setConn(resolved)
       setTables(result)
       setSelectedTables(new Set(result.map((t) => `${t.schema}.${t.name}`)))
       setStep(2)
@@ -391,74 +460,145 @@ export function ImportDatabaseDialog({
         {/* Step 1: Connection */}
         {step === 1 && (
           <div className="flex-1 overflow-y-auto">
-            <FieldGroup>
-              <div className="grid grid-cols-2 gap-4">
+            {/* Input mode toggle */}
+            <div className="flex gap-1 p-1 mb-4 bg-muted rounded-lg w-fit">
+              <button
+                type="button"
+                onClick={() => {
+                  setInputMode("string")
+                  setTestStatus("idle")
+                  setTestMessage("")
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  inputMode === "string"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Link className="w-3.5 h-3.5" />
+                Connection String
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // When switching to fields, populate from connection string if available
+                  if (inputMode === "string" && connectionString) {
+                    const parsed = parseConnectionString(connectionString)
+                    setConn((c) => ({
+                      host: parsed.host || c.host,
+                      port: parsed.port || c.port,
+                      user: parsed.user || c.user,
+                      password: parsed.password ?? c.password,
+                      database: parsed.database || c.database,
+                      ssl: parsed.ssl ?? c.ssl,
+                    }))
+                  }
+                  setInputMode("fields")
+                  setTestStatus("idle")
+                  setTestMessage("")
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  inputMode === "fields"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                Individual Fields
+              </button>
+            </div>
+
+            {inputMode === "string" ? (
+              <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="import-host">Host</FieldLabel>
-                  <Input
-                    id="import-host"
-                    value={conn.host}
-                    onChange={(e) => setConn((c) => ({ ...c, host: e.target.value }))}
-                    placeholder="db.example.com"
-                    className="bg-input border-border"
+                  <FieldLabel htmlFor="import-connstring">Connection String</FieldLabel>
+                  <textarea
+                    id="import-connstring"
+                    value={connectionString}
+                    onChange={(e) => {
+                      setConnectionString(e.target.value)
+                      setTestStatus("idle")
+                      setTestMessage("")
+                    }}
+                    placeholder="postgresql://user:password@host:5432/database?sslmode=require"
+                    rows={3}
+                    className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Paste a connection string from Neon, Supabase, Coolify, Railway, or any PostgreSQL provider.
+                  </p>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="import-port">Port</FieldLabel>
-                  <Input
-                    id="import-port"
-                    type="number"
-                    value={conn.port}
-                    onChange={(e) => setConn((c) => ({ ...c, port: parseInt(e.target.value) || 5432 }))}
-                    className="bg-input border-border"
-                  />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel htmlFor="import-user">Username</FieldLabel>
-                  <Input
-                    id="import-user"
-                    value={conn.user}
-                    onChange={(e) => setConn((c) => ({ ...c, user: e.target.value }))}
-                    placeholder="postgres"
-                    className="bg-input border-border"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="import-password">Password</FieldLabel>
-                  <Input
-                    id="import-password"
-                    type="password"
-                    value={conn.password}
-                    onChange={(e) => setConn((c) => ({ ...c, password: e.target.value }))}
-                    className="bg-input border-border"
-                  />
-                </Field>
-              </div>
-              <Field>
-                <FieldLabel htmlFor="import-database">Database</FieldLabel>
-                <Input
-                  id="import-database"
-                  value={conn.database}
-                  onChange={(e) => setConn((c) => ({ ...c, database: e.target.value }))}
-                  placeholder="techtegrity"
-                  className="bg-input border-border"
-                />
-              </Field>
-              <Field orientation="horizontal">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="import-ssl"
-                    checked={conn.ssl}
-                    onCheckedChange={(checked) => setConn((c) => ({ ...c, ssl: checked }))}
-                  />
-                  <Label htmlFor="import-ssl" className="text-sm">
-                    Use SSL
-                  </Label>
+              </FieldGroup>
+            ) : (
+              <FieldGroup>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="import-host">Host</FieldLabel>
+                    <Input
+                      id="import-host"
+                      value={conn.host}
+                      onChange={(e) => setConn((c) => ({ ...c, host: e.target.value }))}
+                      placeholder="db.example.com"
+                      className="bg-input border-border"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="import-port">Port</FieldLabel>
+                    <Input
+                      id="import-port"
+                      type="number"
+                      value={conn.port}
+                      onChange={(e) => setConn((c) => ({ ...c, port: parseInt(e.target.value) || 5432 }))}
+                      className="bg-input border-border"
+                    />
+                  </Field>
                 </div>
-              </Field>
-            </FieldGroup>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="import-user">Username</FieldLabel>
+                    <Input
+                      id="import-user"
+                      value={conn.user}
+                      onChange={(e) => setConn((c) => ({ ...c, user: e.target.value }))}
+                      placeholder="postgres"
+                      className="bg-input border-border"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="import-password">Password</FieldLabel>
+                    <Input
+                      id="import-password"
+                      type="password"
+                      value={conn.password}
+                      onChange={(e) => setConn((c) => ({ ...c, password: e.target.value }))}
+                      className="bg-input border-border"
+                    />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="import-database">Database</FieldLabel>
+                  <Input
+                    id="import-database"
+                    value={conn.database}
+                    onChange={(e) => setConn((c) => ({ ...c, database: e.target.value }))}
+                    placeholder="techtegrity"
+                    className="bg-input border-border"
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="import-ssl"
+                      checked={conn.ssl}
+                      onCheckedChange={(checked) => setConn((c) => ({ ...c, ssl: checked }))}
+                    />
+                    <Label htmlFor="import-ssl" className="text-sm">
+                      Use SSL
+                    </Label>
+                  </div>
+                </Field>
+              </FieldGroup>
+            )}
 
             {testStatus === "success" && (
               <div className="mt-4 p-3 rounded-lg bg-chart-2/10 border border-chart-2/20 text-sm text-chart-2 flex items-center gap-2">
@@ -692,7 +832,7 @@ export function ImportDatabaseDialog({
               <Button
                 variant="outline"
                 onClick={handleTestConnection}
-                disabled={!conn.host || !conn.database || !conn.user || testStatus === "testing"}
+                disabled={!isConnectionValid() || testStatus === "testing"}
                 className="gap-2"
               >
                 {testStatus === "testing" && <Loader2 className="w-4 h-4 animate-spin" />}
