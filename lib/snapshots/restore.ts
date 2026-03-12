@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { snapshot, connectionConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { downloadSnapshot } from "@/lib/storage/s3"
+import { regrantDatabaseSchemas } from "@/lib/pg/queries"
 
 function runPgRestore(args: string[], env: Record<string, string>): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -99,6 +100,27 @@ export async function executeRestore(
 
     // Run pg_restore
     await runPgRestore(args, env)
+
+    // Re-grant schema privileges — pg_restore runs as admin so restored
+    // schemas/tables are owned by the admin user, not the DB owner.
+    try {
+      const { Pool: PgPool } = await import("pg")
+      const adminPool = new PgPool({
+        host: pgConfig.host,
+        port: pgConfig.port,
+        user: pgConfig.username,
+        password: pgConfig.password || undefined,
+        max: 1,
+        ssl: pgConfig.sslMode === "require" ? { rejectUnauthorized: false } : undefined,
+      })
+      try {
+        await regrantDatabaseSchemas(adminPool, dbName)
+      } finally {
+        await adminPool.end()
+      }
+    } catch (grantErr) {
+      console.error(`[restore] Schema grant warning for ${dbName}:`, grantErr)
+    }
 
     console.log(`[restore] Completed: snapshot ${snapshotId} → database ${dbName}`)
   } finally {

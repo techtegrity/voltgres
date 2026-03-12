@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server"
 import { getServerSession } from "@/lib/auth-server"
 import { getUserPool, getUserPoolForDb } from "@/lib/api/get-pg-pool"
-import { createDatabase } from "@/lib/pg/queries"
+import { createDatabase, regrantDatabaseSchemas } from "@/lib/pg/queries"
 import {
   createTemporaryPool,
   getForeignKeyDependencies,
@@ -191,6 +191,17 @@ export async function POST(request: NextRequest) {
             } catch {
               fkErrors++
             }
+          }
+        }
+
+        // Re-grant schema privileges to DB owner and all granted users.
+        // Import runs as admin so imported schemas/tables are owned by postgres.
+        const grantPool = await getUserPool(session.user.id)
+        if (grantPool) {
+          try {
+            await regrantDatabaseSchemas(grantPool, targetDbName)
+          } catch (error) {
+            send({ type: "warning", message: `Schema grants: ${(error as Error).message}` })
           }
         }
 

@@ -51,17 +51,16 @@ export async function createDatabase(
     `CREATE DATABASE "${safeName}" OWNER "${safeOwner}" ENCODING '${safeEncoding}'`
   )
 
-  // PG 15+ revoked default CREATE on public schema — grant full access to the
-  // owner so they (and apps connecting as them) can create schemas, run
-  // migrations, etc. without hitting "permission denied for schema" errors.
-  // Also grant CREATE ON DATABASE so the owner can create new schemas (e.g.
-  // Drizzle's "drizzle" migration-tracking schema).
-  await pool.query(`GRANT CREATE ON DATABASE "${safeName}" TO "${safeOwner}"`)
+  // Grant full database-level privileges (CREATE lets owner create new schemas,
+  // e.g. Drizzle's "drizzle" migration-tracking schema).
+  await pool.query(`GRANT ALL PRIVILEGES ON DATABASE "${safeName}" TO "${safeOwner}"`)
+
+  // PG 15+ revoked default CREATE on public schema — grant access on ALL
+  // existing non-system schemas (not just public) so the owner can use schemas
+  // inherited from template1 or created by other roles.
   const dbPool = await getDbPool(pool, safeName)
   try {
-    await dbPool.query(`GRANT ALL ON SCHEMA public TO "${safeOwner}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${safeOwner}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${safeOwner}"`)
+    await grantAllSchemas(dbPool, safeOwner)
   } finally {
     await dbPool.end()
   }
@@ -163,6 +162,30 @@ export async function updatePgUser(
   }
 }
 
+// Grant ALL on every non-system schema in the target database: schema-level
+// privileges, existing objects, and default privileges for future objects.
+// Handles schemas created by imports/restores (owned by admin) and
+// PG 15+ public-schema restrictions.
+async function grantAllSchemas(dbPool: Pool, safeRole: string) {
+  const { rows } = await dbPool.query(`
+    SELECT nspname FROM pg_namespace
+    WHERE nspname NOT LIKE 'pg_%' AND nspname <> 'information_schema'
+  `)
+  for (const row of rows) {
+    const schema = (row.nspname as string).replace(/[^a-zA-Z0-9_]/g, "_")
+    await dbPool.query(`GRANT ALL ON SCHEMA "${schema}" TO "${safeRole}"`)
+    // Grant on existing objects (e.g. tables created during import/restore)
+    await dbPool.query(`GRANT ALL ON ALL TABLES IN SCHEMA "${schema}" TO "${safeRole}"`)
+    await dbPool.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA "${schema}" TO "${safeRole}"`)
+    // Grant on future objects created by the admin role in this schema
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" GRANT ALL ON TABLES TO "${safeRole}"`)
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" GRANT ALL ON SEQUENCES TO "${safeRole}"`)
+  }
+  // Also cover future schemas created by the admin role
+  await dbPool.query(`ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO "${safeRole}"`)
+  await dbPool.query(`ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO "${safeRole}"`)
+}
+
 // Get a short-lived pool connected to a specific database, inheriting
 // credentials from an existing pool (pool.options drops password/ssl,
 // so we grab them from an actual client connection).
@@ -185,6 +208,38 @@ async function getDbPool(pool: Pool, dbName: string): Promise<Pool> {
   }
 }
 
+// Re-apply schema-level grants to all non-system roles that have access
+// to the database. Call this after import or restore operations that may
+// have created schemas/tables owned by the admin (postgres) user.
+export async function regrantDatabaseSchemas(pool: Pool, dbName: string) {
+  const safeName = dbName.replace(/[^a-zA-Z0-9_]/g, "_")
+
+  // Find all non-system, non-superuser roles with CREATE privilege on this DB.
+  // This catches the owner (implicit CREATE) and roles explicitly granted
+  // via grantAccess (ALL PRIVILEGES). Using CREATE avoids picking up every
+  // role via PUBLIC's default CONNECT privilege.
+  const { rows } = await pool.query(
+    `SELECT r.rolname
+     FROM pg_roles r
+     WHERE r.rolname NOT LIKE 'pg_%'
+       AND r.rolname <> 'postgres'
+       AND NOT r.rolsuper
+       AND has_database_privilege(r.rolname, $1, 'CREATE')`,
+    [safeName]
+  )
+  if (rows.length === 0) return
+
+  const dbPool = await getDbPool(pool, safeName)
+  try {
+    for (const row of rows) {
+      const safeRole = (row.rolname as string).replace(/[^a-zA-Z0-9_]/g, "_")
+      await grantAllSchemas(dbPool, safeRole)
+    }
+  } finally {
+    await dbPool.end()
+  }
+}
+
 export async function grantAccess(
   pool: Pool,
   username: string,
@@ -197,13 +252,11 @@ export async function grantAccess(
   // create schemas (e.g. Drizzle's "drizzle" schema), tables, etc.
   await pool.query(`GRANT ALL PRIVILEGES ON DATABASE "${safeDbName}" TO "${safeUsername}"`)
 
-  // Also grant usage + create on public schema (PG 15+ revoked public CREATE by default)
-  // We need a connection to the target DB for schema-level grants
+  // Grant on all existing non-system schemas (not just public) so the user
+  // can use schemas inherited from template1 or created by other roles.
   const dbPool = await getDbPool(pool, safeDbName)
   try {
-    await dbPool.query(`GRANT ALL ON SCHEMA public TO "${safeUsername}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${safeUsername}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${safeUsername}"`)
+    await grantAllSchemas(dbPool, safeUsername)
   } finally {
     await dbPool.end()
   }
@@ -218,12 +271,23 @@ export async function revokeAccess(
   const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, "_")
   await pool.query(`REVOKE ALL PRIVILEGES ON DATABASE "${safeDbName}" FROM "${safeUsername}"`)
 
-  // Also revoke schema-level privileges
+  // Revoke schema-level privileges on ALL non-system schemas (matches grantAccess)
   const dbPool = await getDbPool(pool, safeDbName)
   try {
-    await dbPool.query(`REVOKE ALL ON SCHEMA public FROM "${safeUsername}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM "${safeUsername}"`)
-    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM "${safeUsername}"`)
+    const { rows } = await dbPool.query(`
+      SELECT nspname FROM pg_namespace
+      WHERE nspname NOT LIKE 'pg_%' AND nspname <> 'information_schema'
+    `)
+    for (const row of rows) {
+      const schema = (row.nspname as string).replace(/[^a-zA-Z0-9_]/g, "_")
+      await dbPool.query(`REVOKE ALL ON SCHEMA "${schema}" FROM "${safeUsername}"`)
+      await dbPool.query(`REVOKE ALL ON ALL TABLES IN SCHEMA "${schema}" FROM "${safeUsername}"`)
+      await dbPool.query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA "${schema}" FROM "${safeUsername}"`)
+      await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" REVOKE ALL ON TABLES FROM "${safeUsername}"`)
+      await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" REVOKE ALL ON SEQUENCES FROM "${safeUsername}"`)
+    }
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES REVOKE ALL ON TABLES FROM "${safeUsername}"`)
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES REVOKE ALL ON SEQUENCES FROM "${safeUsername}"`)
   } finally {
     await dbPool.end()
   }
