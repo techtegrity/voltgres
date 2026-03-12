@@ -46,7 +46,8 @@ interface ConnectionConfig {
 type ConnectionInputMode = "string" | "fields"
 
 function parseConnectionString(str: string): Partial<ConnectionConfig> {
-  const s = str.trim()
+  // Strip env var prefix like DATABASE_URL= or POSTGRES_URL=
+  const s = str.trim().replace(/^[A-Z_]+=/, "")
   if (!s) return {}
 
   try {
@@ -443,7 +444,7 @@ export function ImportDatabaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="bg-card border-border max-w-2xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Database className="w-5 h-5" />
@@ -650,7 +651,7 @@ export function ImportDatabaseDialog({
               </Label>
             </div>
 
-            <ScrollArea className="flex-1 max-h-[340px] border border-border rounded-lg">
+            <ScrollArea className="flex-1 min-h-0 border border-border rounded-lg">
               <div className="divide-y divide-border">
                 {filteredTables.map((t) => {
                   const key = `${t.schema}.${t.name}`
@@ -771,7 +772,7 @@ export function ImportDatabaseDialog({
               </div>
             )}
 
-            <ScrollArea className="flex-1 max-h-[340px]">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-1">
                 {Array.from(tableProgress.values()).map((tp) => {
                   const key = `${tp.schema}.${tp.table}`
