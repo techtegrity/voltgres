@@ -610,9 +610,10 @@ export async function importTable(
           const isJson = colType === "json" || colType === "jsonb"
           const val = row[col]
 
-          if (isJson && val != null && typeof val === "object") {
-            // pg driver parses JSON into JS objects on read; stringify for insert
-            params.push(JSON.stringify(val))
+          if (isJson && val != null) {
+            // pg driver parses JSON into JS values on read (objects, arrays,
+            // strings, numbers, booleans); always re-stringify for insert
+            params.push(typeof val === "string" ? val : JSON.stringify(val))
           } else {
             params.push(val)
           }
