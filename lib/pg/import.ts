@@ -103,6 +103,13 @@ export function createTemporaryPool(config: PgConnectionConfig): Pool {
   })
 }
 
+/** Normalise a PG array_agg result to a JS string array (handles both native arrays and {a,b} strings) */
+function toStringArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map(String)
+  if (typeof val === "string") return val.replace(/^\{|\}$/g, "").split(",")
+  return []
+}
+
 // ── Schema Introspection ─────────────────────────────────────────────────
 
 export async function listExternalTables(pool: Pool): Promise<ExternalTableInfo[]> {
@@ -180,7 +187,9 @@ export async function getTableSchema(
     `,
     [regclass]
   )
-  const primaryKey: string[] | null = pkResult.rows[0]?.columns || null
+  const primaryKey: string[] | null = pkResult.rows[0]?.columns
+    ? toStringArray(pkResult.rows[0].columns)
+    : null
 
   // Unique constraints
   const uqResult = await pool.query(
@@ -198,7 +207,7 @@ export async function getTableSchema(
   )
   const uniqueConstraints: UniqueConstraint[] = uqResult.rows.map((r) => ({
     name: r.name,
-    columns: r.columns,
+    columns: toStringArray(r.columns),
   }))
 
   // Check constraints (exclude NOT NULL)
@@ -252,10 +261,10 @@ export async function getTableSchema(
 
   const foreignKeys: ForeignKeyDef[] = fkResult.rows.map((r) => ({
     constraintName: r.constraint_name,
-    columns: r.columns,
+    columns: toStringArray(r.columns),
     referencedSchema: r.referenced_schema,
     referencedTable: r.referenced_table,
-    referencedColumns: r.referenced_columns,
+    referencedColumns: toStringArray(r.referenced_columns),
     onDelete: actionMap[r.on_delete] || "NO ACTION",
     onUpdate: actionMap[r.on_update] || "NO ACTION",
   }))
