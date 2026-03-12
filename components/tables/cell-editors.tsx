@@ -1,9 +1,17 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useCallback } from "react"
+import {
+  useFloating,
+  offset,
+  flip,
+  shift,
+  autoUpdate,
+  FloatingPortal,
+  FloatingFocusManager,
+} from "@floating-ui/react"
 import { type ColumnRow } from "@/lib/api-client"
 import { getInputType } from "@/lib/table-utils"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -22,9 +30,11 @@ export interface CellEditorProps {
   onCancel: () => void
   onSetNull: () => void
   saving: boolean
+  /** The <td> element (or wrapper) that anchors this editor */
+  anchorEl: HTMLElement | null
 }
 
-// ── Action bar shown below the editor ────────────────────────────────
+// ── Action bar at the bottom of every popout editor ──────────────────
 
 function EditorActionBar({
   column,
@@ -34,10 +44,10 @@ function EditorActionBar({
   saving,
 }: Pick<CellEditorProps, "column" | "onSave" | "onCancel" | "onSetNull" | "saving">) {
   return (
-    <div className="absolute left-0 top-full mt-1 z-30 flex items-center gap-1.5 bg-popover border border-border rounded-md shadow-md px-2 py-1.5 whitespace-nowrap">
+    <div className="flex items-center gap-1.5 border-t border-border px-2 py-1.5 bg-muted/30">
       {column.nullable && (
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           className="h-6 text-xs px-2"
           onClick={(e) => {
@@ -51,7 +61,7 @@ function EditorActionBar({
       )}
       <div className="flex-1" />
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         className="h-6 text-xs px-2 gap-1"
         onClick={(e) => {
@@ -89,9 +99,9 @@ function EditorActionBar({
   )
 }
 
-// ── Text / Number / Date editor ──────────────────────────────────────
+// ── Text / Number / Date popout ──────────────────────────────────────
 
-function InputCellEditor({
+function InputPopout({
   value,
   column,
   onChange,
@@ -99,12 +109,20 @@ function InputCellEditor({
   onCancel,
   onSetNull,
   saving,
+  anchorEl,
   inputType,
 }: CellEditorProps & { inputType: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const { refs, floatingStyles, context } = useFloating({
+    open: true,
+    placement: "bottom-start",
+    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+    elements: { reference: anchorEl },
+  })
+
   useEffect(() => {
-    // Focus and select on mount
     const el = inputRef.current
     if (el) {
       el.focus()
@@ -121,39 +139,52 @@ function InputCellEditor({
       e.preventDefault()
       e.stopPropagation()
       onSave()
-    } else if (e.key === "Enter" && inputType !== "textarea") {
+    } else if (e.key === "Enter") {
       e.preventDefault()
       e.stopPropagation()
       onSave()
     }
   }
 
+  // Match anchor width, minimum 240px
+  const minWidth = anchorEl ? Math.max(anchorEl.offsetWidth, 240) : 240
+
   return (
-    <div className="relative">
-      <Input
-        ref={inputRef}
-        type={inputType === "text" ? "text" : inputType}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={saving}
-        className="h-7 text-xs font-mono bg-background border-0 ring-0 shadow-none focus-visible:ring-0 p-0 rounded-none"
-        onClick={(e) => e.stopPropagation()}
-      />
-      <EditorActionBar
-        column={column}
-        onSave={onSave}
-        onCancel={onCancel}
-        onSetNull={onSetNull}
-        saving={saving}
-      />
-    </div>
+    <FloatingPortal>
+      <FloatingFocusManager context={context} modal={false}>
+        <div
+          ref={refs.setFloating}
+          style={{ ...floatingStyles, minWidth }}
+          className="z-50 rounded-md border border-border bg-popover shadow-lg overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-2">
+            <input
+              ref={inputRef}
+              type={inputType === "text" ? "text" : inputType}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={saving}
+              className="w-full h-8 text-sm font-mono bg-background border border-border rounded px-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <EditorActionBar
+            column={column}
+            onSave={onSave}
+            onCancel={onCancel}
+            onSetNull={onSetNull}
+            saving={saving}
+          />
+        </div>
+      </FloatingFocusManager>
+    </FloatingPortal>
   )
 }
 
-// ── Textarea editor (JSON/JSONB) ─────────────────────────────────────
+// ── Textarea popout (JSON / text / long content) ─────────────────────
 
-function TextareaCellEditor({
+function TextareaPopout({
   value,
   column,
   onChange,
@@ -161,14 +192,23 @@ function TextareaCellEditor({
   onCancel,
   onSetNull,
   saving,
+  anchorEl,
 }: CellEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const { refs, floatingStyles, context } = useFloating({
+    open: true,
+    placement: "bottom-start",
+    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+    elements: { reference: anchorEl },
+  })
 
   useEffect(() => {
     const el = textareaRef.current
     if (el) {
       el.focus()
-      el.select()
+      el.setSelectionRange(0, el.value.length)
     }
   }, [])
 
@@ -184,73 +224,117 @@ function TextareaCellEditor({
     }
   }
 
+  const minWidth = anchorEl ? Math.max(anchorEl.offsetWidth, 320) : 320
+
   return (
-    <div className="relative">
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={saving}
-        rows={3}
-        className="w-full text-xs font-mono bg-background border-0 ring-0 shadow-none focus:outline-none resize-y min-h-[28px] p-0 rounded-none"
-        onClick={(e) => e.stopPropagation()}
-      />
-      <EditorActionBar
-        column={column}
-        onSave={onSave}
-        onCancel={onCancel}
-        onSetNull={onSetNull}
-        saving={saving}
-      />
-    </div>
+    <FloatingPortal>
+      <FloatingFocusManager context={context} modal={false}>
+        <div
+          ref={refs.setFloating}
+          style={{ ...floatingStyles, minWidth }}
+          className="z-50 rounded-md border border-border bg-popover shadow-lg overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-2">
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={saving}
+              rows={6}
+              className="w-full text-sm font-mono bg-background border border-border rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary resize-y min-h-[80px]"
+            />
+          </div>
+          <EditorActionBar
+            column={column}
+            onSave={onSave}
+            onCancel={onCancel}
+            onSetNull={onSetNull}
+            saving={saving}
+          />
+        </div>
+      </FloatingFocusManager>
+    </FloatingPortal>
   )
 }
 
-// ── Boolean editor (dropdown) ────────────────────────────────────────
+// ── Boolean popout (dropdown) ────────────────────────────────────────
 
-function BooleanCellEditor({
+function BooleanPopout({
   value,
   column,
   onChange,
   onSave,
   onCancel,
+  onSetNull,
   saving,
+  anchorEl,
 }: CellEditorProps) {
-  const handleSelect = (newValue: string) => {
-    onChange(newValue)
-    // Boolean saves immediately on selection
-    // We need a small delay so onChange is processed first
-    setTimeout(() => {
-      onSave()
-    }, 0)
-  }
+  const { refs, floatingStyles, context } = useFloating({
+    open: true,
+    placement: "bottom-start",
+    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+    elements: { reference: anchorEl },
+  })
 
-  // Map current value to select value
   const selectValue =
     value === "true" ? "true" : value === "false" ? "false" : "null"
 
+  const handleSelect = useCallback(
+    (newValue: string) => {
+      if (newValue === "null") {
+        onSetNull()
+      } else {
+        onChange(newValue)
+        // Save immediately on boolean selection
+        setTimeout(() => onSave(), 0)
+      }
+    },
+    [onChange, onSave, onSetNull]
+  )
+
+  const minWidth = anchorEl ? Math.max(anchorEl.offsetWidth, 140) : 140
+
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <Select
-        value={selectValue}
-        onValueChange={handleSelect}
-        disabled={saving}
-        open
-        onOpenChange={(open) => {
-          if (!open) onCancel()
-        }}
-      >
-        <SelectTrigger className="h-7 text-xs font-mono border-0 ring-0 shadow-none p-0 rounded-none bg-transparent focus:ring-0 [&>svg]:hidden">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="true">TRUE</SelectItem>
-          <SelectItem value="false">FALSE</SelectItem>
-          {column.nullable && <SelectItem value="null">NULL</SelectItem>}
-        </SelectContent>
-      </Select>
-    </div>
+    <FloatingPortal>
+      <FloatingFocusManager context={context} modal={false}>
+        <div
+          ref={refs.setFloating}
+          style={{ ...floatingStyles, minWidth }}
+          className="z-50 rounded-md border border-border bg-popover shadow-lg overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-1">
+            {[
+              { value: "true", label: "TRUE" },
+              { value: "false", label: "FALSE" },
+              ...(column.nullable
+                ? [{ value: "null", label: "NULL" }]
+                : []),
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted/80 flex items-center justify-between ${
+                  selectValue === opt.value ? "bg-muted/50 font-medium" : ""
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSelect(opt.value)
+                }}
+                disabled={saving}
+              >
+                {opt.label}
+                {selectValue === opt.value && (
+                  <span className="text-muted-foreground">✓</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </FloatingFocusManager>
+    </FloatingPortal>
   )
 }
 
@@ -261,15 +345,19 @@ export function CellEditor(props: CellEditorProps) {
 
   switch (inputType) {
     case "boolean":
-      return <BooleanCellEditor {...props} />
+      return <BooleanPopout {...props} />
     case "textarea":
-      return <TextareaCellEditor {...props} />
+      return <TextareaPopout {...props} />
     case "number":
     case "date":
     case "time":
     case "datetime-local":
-      return <InputCellEditor {...props} inputType={inputType} />
+      return <InputPopout {...props} inputType={inputType} />
     default:
-      return <InputCellEditor {...props} inputType="text" />
+      // Use textarea popout for long text content, input for short values
+      if (props.value.length > 80 || props.value.includes("\n")) {
+        return <TextareaPopout {...props} />
+      }
+      return <InputPopout {...props} inputType="text" />
   }
 }
