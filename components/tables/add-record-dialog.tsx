@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { type ColumnRow } from "@/lib/api-client"
+import { getInputType, isAutoColumn } from "@/lib/table-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -23,27 +24,6 @@ interface AddRecordDialogProps {
   onOpenChange: (open: boolean) => void
   columnMeta: ColumnRow[]
   onSubmit: (data: Record<string, unknown>) => Promise<void>
-}
-
-function isAutoColumn(col: ColumnRow): boolean {
-  const def = col.default_value || ""
-  return (
-    def.startsWith("nextval(") ||
-    def.startsWith("gen_random_uuid()") ||
-    def === "now()" ||
-    def === "CURRENT_TIMESTAMP"
-  )
-}
-
-function getInputType(col: ColumnRow): string {
-  const t = col.udt_type || col.type
-  if (["int2", "int4", "int8", "float4", "float8", "numeric", "decimal", "integer", "bigint", "smallint", "real", "double precision"].includes(t)) return "number"
-  if (["bool", "boolean"].includes(t)) return "boolean"
-  if (["timestamp", "timestamptz"].includes(t)) return "datetime-local"
-  if (["date"].includes(t)) return "date"
-  if (["time", "timetz"].includes(t)) return "time"
-  if (["json", "jsonb"].includes(t)) return "textarea"
-  return "text"
 }
 
 export function AddRecordDialog({

@@ -326,8 +326,12 @@ export default function DatabaseTablesPage({
                         toggleAllOnPage={tableData.toggleAllOnPage}
                         getRowKey={tableData.getRowKey}
                         hasPrimaryKey={tableData.hasPrimaryKey}
+                        primaryKeys={tableData.primaryKeys}
                         onEditRow={handleEditRow}
                         onDeleteRow={handleDeleteRow}
+                        onUpdateCell={async (pkValues, column, value) => {
+                          await tableData.updateRow(pkValues, { [column]: value })
+                        }}
                         loading={tableData.loading}
                       />
                     </div>

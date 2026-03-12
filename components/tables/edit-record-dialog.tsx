@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { type ColumnRow } from "@/lib/api-client"
+import { getInputType, valueToString } from "@/lib/table-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -28,24 +29,6 @@ interface EditRecordDialogProps {
     pkValues: Record<string, unknown>,
     data: Record<string, unknown>
   ) => Promise<void>
-}
-
-function getInputType(col: ColumnRow): string {
-  const t = col.udt_type || col.type
-  if (["int2", "int4", "int8", "float4", "float8", "numeric", "decimal", "integer", "bigint", "smallint", "real", "double precision"].includes(t)) return "number"
-  if (["bool", "boolean"].includes(t)) return "boolean"
-  if (["timestamp", "timestamptz"].includes(t)) return "datetime-local"
-  if (["date"].includes(t)) return "date"
-  if (["time", "timetz"].includes(t)) return "time"
-  if (["json", "jsonb"].includes(t)) return "textarea"
-  return "text"
-}
-
-function valueToString(value: unknown): string {
-  if (value === null || value === undefined) return ""
-  if (typeof value === "boolean") return value ? "true" : "false"
-  if (typeof value === "object") return JSON.stringify(value, null, 2)
-  return String(value)
 }
 
 export function EditRecordDialog({
