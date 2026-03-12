@@ -2,7 +2,10 @@ export function generatePassword(length = 20): string {
   const lowercase = "abcdefghijkmnopqrstuvwxyz"
   const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ"
   const digits = "23456789"
-  const symbols = "!@#$%&*_-+"
+  // Avoid characters that break connection URIs or shell contexts:
+  // no @ (URI user/host delimiter), # (URI fragment), % (percent-encoding),
+  // * (glob), ! (shell history), / \ (path separators), + (URI space)
+  const symbols = "._-~^"
   const all = lowercase + uppercase + digits + symbols
   const array = new Uint8Array(length)
   crypto.getRandomValues(array)

@@ -128,8 +128,8 @@ export function ConnectionModal({
       if (initialUser) {
         setSelectedUser(initialUser)
       } else {
-        // Will be resolved by the auto-select effect once filteredUsers updates
-        setSelectedUser("")
+        // Set best default now; auto-select effect will correct if data loads later
+        setSelectedUser(bestDefaultUser)
       }
       userManuallySelected.current = false
       setTempPassword(null)
@@ -137,6 +137,7 @@ export function ConnectionModal({
       setShowPassword(false)
       setCopied(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bestDefaultUser read once on open
   }, [open, initialDatabase, initialUser])
 
   // Filter users by selected database
