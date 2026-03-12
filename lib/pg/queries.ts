@@ -50,6 +50,18 @@ export async function createDatabase(
   await pool.query(
     `CREATE DATABASE "${safeName}" OWNER "${safeOwner}" ENCODING '${safeEncoding}'`
   )
+
+  // PG 15+ revoked default CREATE on public schema — grant full access to the
+  // owner so they (and apps connecting as them) can create schemas, run
+  // migrations, etc. without hitting "permission denied for schema" errors.
+  const dbPool = await getDbPool(pool, safeName)
+  try {
+    await dbPool.query(`GRANT ALL ON SCHEMA public TO "${safeOwner}"`)
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${safeOwner}"`)
+    await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${safeOwner}"`)
+  } finally {
+    await dbPool.end()
+  }
 }
 
 export async function dropDatabase(pool: Pool, name: string) {
