@@ -116,6 +116,8 @@ export async function listExternalTables(pool: Pool): Promise<ExternalTableInfo[
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind = 'r'
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+      AND has_schema_privilege(n.oid, 'USAGE')
+      AND has_table_privilege(c.oid, 'SELECT')
     ORDER BY n.nspname, c.relname
   `)
   return result.rows.map((r) => ({
@@ -368,27 +370,31 @@ export async function getForeignKeyDependencies(
 
   for (const t of tables) {
     const regclass = `"${t.schema}"."${t.name}"`
-    const result = await pool.query(
-      `
-      SELECT
-        nf.nspname AS ref_schema,
-        cf.relname AS ref_table
-      FROM pg_constraint c
-      JOIN pg_class cf ON cf.oid = c.confrelid
-      JOIN pg_namespace nf ON nf.oid = cf.relnamespace
-      WHERE c.conrelid = $1::regclass AND c.contype = 'f'
-      `,
-      [regclass]
-    )
-    for (const r of result.rows) {
-      if (tableSet.has(`${r.ref_schema}.${r.ref_table}`)) {
-        deps.push({
-          fromSchema: t.schema,
-          fromTable: t.name,
-          toSchema: r.ref_schema,
-          toTable: r.ref_table,
-        })
+    try {
+      const result = await pool.query(
+        `
+        SELECT
+          nf.nspname AS ref_schema,
+          cf.relname AS ref_table
+        FROM pg_constraint c
+        JOIN pg_class cf ON cf.oid = c.confrelid
+        JOIN pg_namespace nf ON nf.oid = cf.relnamespace
+        WHERE c.conrelid = $1::regclass AND c.contype = 'f'
+        `,
+        [regclass]
+      )
+      for (const r of result.rows) {
+        if (tableSet.has(`${r.ref_schema}.${r.ref_table}`)) {
+          deps.push({
+            fromSchema: t.schema,
+            fromTable: t.name,
+            toSchema: r.ref_schema,
+            toTable: r.ref_table,
+          })
+        }
       }
+    } catch {
+      // Skip tables we can't introspect (permission denied, etc.)
     }
   }
 
