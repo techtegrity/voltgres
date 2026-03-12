@@ -94,6 +94,22 @@ export interface PublicConnectionInfo {
   publicPort: number
 }
 
+export interface TableFilter {
+  column: string
+  operator: string
+  value?: string
+}
+
+export interface TableDataResult {
+  rows: Record<string, unknown>[]
+  columns: string[]
+  columnMeta: ColumnRow[]
+  totalCount: number
+  page: number
+  pageSize: number
+  executionTime: number
+}
+
 export interface StorageConfigData {
   id: string
   provider: "s3" | "r2"
@@ -175,6 +191,65 @@ export const api = {
       apiFetch<ColumnRow[]>(
         `/api/pg/tables/columns?db=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`
       ),
+    rows: (
+      db: string,
+      schema: string,
+      table: string,
+      opts: {
+        page?: number
+        pageSize?: number
+        sort?: string
+        sortDir?: "asc" | "desc"
+        filters?: TableFilter[]
+        columns?: string[]
+      } = {}
+    ) => {
+      const params = new URLSearchParams({
+        db,
+        schema,
+        table,
+        page: String(opts.page ?? 1),
+        pageSize: String(opts.pageSize ?? 50),
+      })
+      if (opts.sort) params.set("sort", opts.sort)
+      if (opts.sortDir) params.set("sortDir", opts.sortDir)
+      if (opts.filters?.length)
+        params.set("filters", JSON.stringify(opts.filters))
+      if (opts.columns?.length)
+        params.set("columns", opts.columns.join(","))
+      return apiFetch<TableDataResult>(`/api/pg/tables/rows?${params}`)
+    },
+    insertRow: (
+      db: string,
+      schema: string,
+      table: string,
+      data: Record<string, unknown>
+    ) =>
+      apiFetch<Record<string, unknown>>("/api/pg/tables/rows", {
+        method: "POST",
+        body: JSON.stringify({ db, schema, table, data }),
+      }),
+    updateRow: (
+      db: string,
+      schema: string,
+      table: string,
+      pkValues: Record<string, unknown>,
+      data: Record<string, unknown>
+    ) =>
+      apiFetch<Record<string, unknown>>("/api/pg/tables/rows", {
+        method: "PATCH",
+        body: JSON.stringify({ db, schema, table, pkValues, data }),
+      }),
+    deleteRows: (
+      db: string,
+      schema: string,
+      table: string,
+      pkValueSets: Record<string, unknown>[]
+    ) =>
+      apiFetch<{ deletedCount: number }>("/api/pg/tables/rows", {
+        method: "DELETE",
+        body: JSON.stringify({ db, schema, table, pkValueSets }),
+      }),
   },
 
   sql: {

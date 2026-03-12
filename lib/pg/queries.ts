@@ -245,6 +245,249 @@ export async function executeSQL(
   }
 }
 
+// ── Table Data CRUD ──────────────────────────────────────────────────────
+
+function quoteIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`
+}
+
+export interface TableFilter {
+  column: string
+  operator:
+    | "eq"
+    | "neq"
+    | "gt"
+    | "gte"
+    | "lt"
+    | "lte"
+    | "like"
+    | "ilike"
+    | "is_null"
+    | "is_not_null"
+  value?: string
+}
+
+interface GetTableRowsOptions {
+  page?: number
+  pageSize?: number
+  filters?: TableFilter[]
+  sort?: string
+  sortDir?: "asc" | "desc"
+  columns?: string[]
+}
+
+function buildWhereClause(
+  filters: TableFilter[],
+  startParam: number
+): { sql: string; params: unknown[] } {
+  if (filters.length === 0) return { sql: "", params: [] }
+
+  const conditions: string[] = []
+  const params: unknown[] = []
+  let paramIdx = startParam
+
+  for (const f of filters) {
+    const col = quoteIdent(f.column)
+    switch (f.operator) {
+      case "eq":
+        conditions.push(`${col} = $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "neq":
+        conditions.push(`${col} != $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "gt":
+        conditions.push(`${col} > $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "gte":
+        conditions.push(`${col} >= $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "lt":
+        conditions.push(`${col} < $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "lte":
+        conditions.push(`${col} <= $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "like":
+        conditions.push(`${col}::text LIKE $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "ilike":
+        conditions.push(`${col}::text ILIKE $${paramIdx++}`)
+        params.push(f.value)
+        break
+      case "is_null":
+        conditions.push(`${col} IS NULL`)
+        break
+      case "is_not_null":
+        conditions.push(`${col} IS NOT NULL`)
+        break
+    }
+  }
+
+  return { sql: `WHERE ${conditions.join(" AND ")}`, params }
+}
+
+export async function getTableRows(
+  pool: Pool,
+  schema: string,
+  table: string,
+  options: GetTableRowsOptions = {}
+) {
+  const {
+    page = 1,
+    pageSize = 50,
+    filters = [],
+    sort,
+    sortDir = "asc",
+    columns,
+  } = options
+
+  const qualifiedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`
+  const selectCols = columns?.length
+    ? columns.map(quoteIdent).join(", ")
+    : "*"
+
+  const where = buildWhereClause(filters, 1)
+  const offset = (page - 1) * pageSize
+
+  const orderBy = sort
+    ? `ORDER BY ${quoteIdent(sort)} ${sortDir === "desc" ? "DESC" : "ASC"} NULLS LAST`
+    : ""
+
+  const limitOffset = `LIMIT $${where.params.length + 1} OFFSET $${where.params.length + 2}`
+
+  const start = performance.now()
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(
+      `SELECT ${selectCols} FROM ${qualifiedTable} ${where.sql} ${orderBy} ${limitOffset}`,
+      [...where.params, pageSize, offset]
+    ),
+    pool.query(
+      `SELECT count(*) AS total FROM ${qualifiedTable} ${where.sql}`,
+      where.params
+    ),
+  ])
+
+  const executionTime = Math.round(performance.now() - start)
+
+  return {
+    rows: dataResult.rows,
+    columns: dataResult.fields.map((f) => f.name),
+    totalCount: parseInt(countResult.rows[0].total, 10),
+    page,
+    pageSize,
+    executionTime,
+  }
+}
+
+export async function getTablePrimaryKeys(
+  pool: Pool,
+  schema: string,
+  table: string
+): Promise<string[]> {
+  const result = await pool.query(
+    `
+    SELECT kcu.column_name
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+    WHERE tc.constraint_type = 'PRIMARY KEY'
+      AND tc.table_schema = $1
+      AND tc.table_name = $2
+    ORDER BY kcu.ordinal_position
+    `,
+    [schema, table]
+  )
+  return result.rows.map((r) => r.column_name)
+}
+
+export async function insertTableRow(
+  pool: Pool,
+  schema: string,
+  table: string,
+  data: Record<string, unknown>
+) {
+  const cols = Object.keys(data)
+  if (cols.length === 0) throw new Error("No data to insert")
+
+  const qualifiedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`
+  const colNames = cols.map(quoteIdent).join(", ")
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ")
+  const values = cols.map((c) => data[c])
+
+  const result = await pool.query(
+    `INSERT INTO ${qualifiedTable} (${colNames}) VALUES (${placeholders}) RETURNING *`,
+    values
+  )
+  return result.rows[0]
+}
+
+export async function updateTableRow(
+  pool: Pool,
+  schema: string,
+  table: string,
+  pkValues: Record<string, unknown>,
+  data: Record<string, unknown>
+) {
+  const pkCols = Object.keys(pkValues)
+  const dataCols = Object.keys(data)
+  if (pkCols.length === 0) throw new Error("Primary key required for update")
+  if (dataCols.length === 0) throw new Error("No data to update")
+
+  const qualifiedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`
+  let paramIdx = 1
+
+  const setClauses = dataCols.map((c) => `${quoteIdent(c)} = $${paramIdx++}`).join(", ")
+  const whereClauses = pkCols.map((c) => `${quoteIdent(c)} = $${paramIdx++}`).join(" AND ")
+  const values = [...dataCols.map((c) => data[c]), ...pkCols.map((c) => pkValues[c])]
+
+  const result = await pool.query(
+    `UPDATE ${qualifiedTable} SET ${setClauses} WHERE ${whereClauses} RETURNING *`,
+    values
+  )
+  return result.rows[0]
+}
+
+export async function deleteTableRows(
+  pool: Pool,
+  schema: string,
+  table: string,
+  pkValueSets: Record<string, unknown>[]
+) {
+  if (pkValueSets.length === 0) throw new Error("No rows to delete")
+  if (pkValueSets.length > 100) throw new Error("Cannot delete more than 100 rows at once")
+
+  const pkCols = Object.keys(pkValueSets[0])
+  if (pkCols.length === 0) throw new Error("Primary key required for delete")
+
+  const qualifiedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`
+  let paramIdx = 1
+  const conditions: string[] = []
+  const params: unknown[] = []
+
+  for (const pkSet of pkValueSets) {
+    const rowCondition = pkCols
+      .map((c) => `${quoteIdent(c)} = $${paramIdx++}`)
+      .join(" AND ")
+    conditions.push(`(${rowCondition})`)
+    pkCols.forEach((c) => params.push(pkSet[c]))
+  }
+
+  const result = await pool.query(
+    `DELETE FROM ${qualifiedTable} WHERE ${conditions.join(" OR ")}`,
+    params
+  )
+  return { deletedCount: result.rowCount ?? 0 }
+}
+
 export async function getServerInfo(pool: Pool) {
   const versionResult = await pool.query("SELECT version()")
   const uptimeResult = await pool.query(

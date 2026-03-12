@@ -1,19 +1,34 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useMemo, use } from "react"
 import { useTables } from "@/hooks/use-tables"
-import { type ColumnRow } from "@/lib/api-client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useTableData } from "@/hooks/use-table-data"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Table2, Columns3, Hash, Key } from "lucide-react"
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  Table2,
+  Plus,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react"
+import { TableDataGrid } from "@/components/tables/table-data-grid"
+import { TableStructureView } from "@/components/tables/table-structure-view"
+import { TableToolbar } from "@/components/tables/table-toolbar"
+import { AddRecordDialog } from "@/components/tables/add-record-dialog"
+import { EditRecordDialog } from "@/components/tables/edit-record-dialog"
+import { DeleteConfirmDialog } from "@/components/tables/delete-confirm-dialog"
 
 function formatNumber(num: number) {
   return new Intl.NumberFormat("en-US").format(num)
@@ -26,147 +41,429 @@ export default function DatabaseTablesPage({
 }) {
   const { id } = use(params)
   const dbName = decodeURIComponent(id)
-  const { tables, loading, getColumns } = useTables(dbName)
+  const { tables, loading: tablesLoading } = useTables(dbName)
+
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
-  const [columns, setColumns] = useState<ColumnRow[]>([])
+  const [selectedSchema, setSelectedSchema] = useState<string>("public")
+  const [activeTab, setActiveTab] = useState<"content" | "structure">("content")
 
-  useEffect(() => {
-    if (selectedTable) {
-      const table = tables.find((t) => t.name === selectedTable)
-      if (table) {
-        getColumns(table.schema, table.name).then(setColumns).catch(() => setColumns([]))
-      }
-    } else {
-      setColumns([])
+  // CRUD dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingRows, setDeletingRows] = useState<Record<string, unknown>[]>([])
+
+  // Group tables by schema
+  const schemaGroups = useMemo(() => {
+    const groups: Record<string, typeof tables> = {}
+    for (const table of tables) {
+      const schema = table.schema || "public"
+      if (!groups[schema]) groups[schema] = []
+      groups[schema].push(table)
     }
-  }, [selectedTable, tables, getColumns])
+    return groups
+  }, [tables])
 
-  const selectedTableData = tables.find((t) => t.name === selectedTable)
+  const schemas = useMemo(() => Object.keys(schemaGroups).sort(), [schemaGroups])
+
+  // Table data hook
+  const tableData = useTableData(dbName, selectedSchema, selectedTable)
+
+  // Handlers
+  const handleSelectTable = (schema: string, name: string) => {
+    if (selectedTable === name && selectedSchema === schema) {
+      setSelectedTable(null)
+    } else {
+      setSelectedSchema(schema)
+      setSelectedTable(name)
+      setActiveTab("content")
+    }
+  }
+
+  const handleEditRow = (row: Record<string, unknown>) => {
+    setEditingRow(row)
+    setEditDialogOpen(true)
+  }
+
+  const handleDeleteRow = (row: Record<string, unknown>) => {
+    const pkValues: Record<string, unknown> = {}
+    for (const pk of tableData.primaryKeys) {
+      pkValues[pk] = row[pk]
+    }
+    setDeletingRows([pkValues])
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteSelected = () => {
+    const pkValueSets: Record<string, unknown>[] = []
+    for (const row of tableData.rows) {
+      const rowKey = tableData.getRowKey(row)
+      if (tableData.selectedRows.has(rowKey)) {
+        const pkValues: Record<string, unknown> = {}
+        for (const pk of tableData.primaryKeys) {
+          pkValues[pk] = row[pk]
+        }
+        pkValueSets.push(pkValues)
+      }
+    }
+    setDeletingRows(pkValueSets)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    await tableData.deleteRows(deletingRows)
+    setDeletingRows([])
+  }
+
+  const selectedTableMeta = tables.find(
+    (t) => t.name === selectedTable && t.schema === selectedSchema
+  )
 
   return (
-    <div className="p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Tables</h1>
-        <p className="text-muted-foreground mt-1">
-          Browse and manage tables in {dbName}
-        </p>
-      </div>
+    <TooltipProvider>
+      <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+        {/* Left sidebar — table list */}
+        <div className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+          <div className="p-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary shrink-0" />
+              {dbName}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {tables.length} {tables.length === 1 ? "table" : "tables"}
+            </p>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tables List */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Schema: public</CardTitle>
-            <CardDescription>{tables.length} tables</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {tables.map((table) => (
-                <button
-                  key={table.name}
-                  onClick={() => setSelectedTable(selectedTable === table.name ? null : table.name)}
-                  className={`w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors ${
-                    selectedTable === table.name ? "bg-muted" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Table2 className="w-4 h-4 text-primary" />
-                      <span className="font-mono text-sm text-foreground">{table.name}</span>
-                    </div>
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      {formatNumber(table.row_count)} rows
-                    </Badge>
-                  </div>
-                </button>
-              ))}
-              {tables.length === 0 && (
-                <div className="px-4 py-8 text-center text-muted-foreground text-sm">
-                  {loading ? "Loading tables..." : "No tables found in this database"}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Table Details */}
-        <Card className="bg-card border-border lg:col-span-2">
-          <CardHeader className="pb-3">
-            {selectedTableData ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Table2 className="w-5 h-5 text-primary" />
-                  <CardTitle className="font-mono">{selectedTableData.name}</CardTitle>
-                </div>
-                <CardDescription className="flex items-center gap-4 mt-1">
-                  <span className="flex items-center gap-1">
-                    <Hash className="w-3 h-3" />
-                    {formatNumber(selectedTableData.row_count)} rows
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Columns3 className="w-3 h-3" />
-                    {columns.length} columns
-                  </span>
-                </CardDescription>
-              </>
+          <ScrollArea className="flex-1 min-h-0">
+            {tablesLoading ? (
+              <div className="px-3 py-8 text-center text-muted-foreground text-xs">
+                Loading tables...
+              </div>
+            ) : tables.length === 0 ? (
+              <div className="px-3 py-8 text-center text-muted-foreground text-xs">
+                No tables found
+              </div>
             ) : (
-              <>
-                <CardTitle>Select a table</CardTitle>
-                <CardDescription>Choose a table from the list to view its schema</CardDescription>
-              </>
-            )}
-          </CardHeader>
-          <CardContent>
-            {selectedTableData ? (
-              <div className="rounded-lg border border-border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border bg-muted/50">
-                      <TableHead className="text-muted-foreground text-xs">Column</TableHead>
-                      <TableHead className="text-muted-foreground text-xs">Type</TableHead>
-                      <TableHead className="text-muted-foreground text-xs">Nullable</TableHead>
-                      <TableHead className="text-muted-foreground text-xs">Key</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {columns.map((col) => (
-                      <TableRow key={col.name} className="border-border">
-                        <TableCell className="font-mono text-sm py-2">
-                          {col.name}
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Badge variant="outline" className="font-mono text-xs font-normal">
-                            {col.udt_type || col.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <span className={`text-xs ${col.nullable ? "text-muted-foreground" : "text-foreground"}`}>
-                            {col.nullable ? "YES" : "NO"}
+              <div className="py-1">
+                {schemas.map((schema) => (
+                  <div key={schema}>
+                    {schemas.length > 1 && (
+                      <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        {schema}
+                      </div>
+                    )}
+                    {schemaGroups[schema].map((table) => {
+                      const isSelected =
+                        selectedTable === table.name &&
+                        selectedSchema === schema
+                      return (
+                        <button
+                          key={`${schema}.${table.name}`}
+                          onClick={() => handleSelectTable(schema, table.name)}
+                          className={`w-full px-3 py-1.5 text-left hover:bg-muted/50 transition-colors flex items-center justify-between group ${
+                            isSelected
+                              ? "bg-primary/10 text-primary"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Table2 className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                            <span className="font-mono text-xs truncate">
+                              {table.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
+                            {formatNumber(table.row_count)}
                           </span>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {col.is_primary_key && (
-                            <div className="flex items-center gap-1 text-xs text-primary">
-                              <Key className="w-3 h-3" />
-                              PK
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="py-12 text-center text-muted-foreground">
-                <Table2 className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p>Select a table to view its columns and structure</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </ScrollArea>
+        </div>
+
+        {/* Right panel — table content */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {selectedTable && selectedTableMeta ? (
+            <>
+              {/* Header */}
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <h1 className="font-mono text-base font-semibold truncate">
+                      {selectedSchema !== "public" && (
+                        <span className="text-muted-foreground">
+                          {selectedSchema}.
+                        </span>
+                      )}
+                      {selectedTable}
+                    </h1>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      <span>
+                        {formatNumber(tableData.totalCount)} rows
+                      </span>
+                      <span>
+                        {tableData.columnMeta.length} columns
+                      </span>
+                      {!tableData.hasPrimaryKey && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex items-center gap-1 text-amber-500">
+                              <AlertTriangle className="w-3 h-3" />
+                              No primary key
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit and delete are disabled for tables without a primary key</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={(v) => setActiveTab(v as "content" | "structure")}
+                    className="ml-4"
+                  >
+                    <TabsList className="h-8">
+                      <TabsTrigger value="content" className="text-xs px-3 h-7">
+                        Content
+                      </TabsTrigger>
+                      <TabsTrigger value="structure" className="text-xs px-3 h-7">
+                        Structure
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Delete selected */}
+                  {tableData.selectedRows.size > 0 && tableData.hasPrimaryKey && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={handleDeleteSelected}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete ({tableData.selectedRows.size})
+                    </Button>
+                  )}
+
+                  {/* Refresh */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => tableData.refresh()}
+                    disabled={tableData.loading}
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 ${
+                        tableData.loading ? "animate-spin" : ""
+                      }`}
+                    />
+                  </Button>
+
+                  {/* Add Record */}
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={() => setAddDialogOpen(true)}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Record
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tab content */}
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                {activeTab === "content" ? (
+                  <>
+                    {/* Toolbar */}
+                    <div className="px-4 py-2 border-b border-border shrink-0">
+                      <TableToolbar
+                        columns={tableData.columns}
+                        columnMeta={tableData.columnMeta}
+                        visibleColumns={tableData.visibleColumns}
+                        setVisibleColumns={tableData.setVisibleColumns}
+                        toggleColumn={tableData.toggleColumn}
+                        filters={tableData.filters}
+                        addFilter={tableData.addFilter}
+                        removeFilter={tableData.removeFilter}
+                        clearFilters={tableData.clearFilters}
+                        pageSize={tableData.pageSize}
+                        setPageSize={tableData.setPageSize}
+                        totalCount={tableData.totalCount}
+                        executionTime={tableData.executionTime}
+                      />
+                    </div>
+
+                    {/* Error banner */}
+                    {tableData.error && (
+                      <div className="mx-4 mt-2 px-3 py-2 text-sm text-destructive bg-destructive/10 rounded-md">
+                        {tableData.error}
+                      </div>
+                    )}
+
+                    {/* Data grid */}
+                    <div className="flex-1 min-h-0 overflow-auto px-4 py-2">
+                      <TableDataGrid
+                        rows={tableData.rows}
+                        visibleColumns={tableData.visibleColumns}
+                        columnMeta={tableData.columnMeta}
+                        sort={tableData.sort}
+                        sortDir={tableData.sortDir}
+                        toggleSort={tableData.toggleSort}
+                        selectedRows={tableData.selectedRows}
+                        toggleRowSelection={tableData.toggleRowSelection}
+                        toggleAllOnPage={tableData.toggleAllOnPage}
+                        getRowKey={tableData.getRowKey}
+                        hasPrimaryKey={tableData.hasPrimaryKey}
+                        onEditRow={handleEditRow}
+                        onDeleteRow={handleDeleteRow}
+                        loading={tableData.loading}
+                      />
+                    </div>
+
+                    {/* Pagination */}
+                    {tableData.totalPages > 1 && (
+                      <div className="px-4 py-2 border-t border-border flex items-center justify-between shrink-0">
+                        <span className="text-xs text-muted-foreground">
+                          Page {tableData.page} of {tableData.totalPages}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={tableData.page <= 1}
+                            onClick={() => tableData.setPage(tableData.page - 1)}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+
+                          {/* Page numbers */}
+                          {generatePageNumbers(tableData.page, tableData.totalPages).map(
+                            (p, i) =>
+                              p === "..." ? (
+                                <span
+                                  key={`dots-${i}`}
+                                  className="px-1 text-xs text-muted-foreground"
+                                >
+                                  ...
+                                </span>
+                              ) : (
+                                <Button
+                                  key={p}
+                                  variant={p === tableData.page ? "default" : "outline"}
+                                  size="icon"
+                                  className="h-7 w-7 text-xs"
+                                  onClick={() => tableData.setPage(p as number)}
+                                >
+                                  {p}
+                                </Button>
+                              )
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={tableData.page >= tableData.totalPages}
+                            onClick={() => tableData.setPage(tableData.page + 1)}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Structure tab */
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
+                    <TableStructureView columns={tableData.columnMeta} />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* No table selected */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <Table2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+                <h2 className="text-lg font-medium text-muted-foreground mb-1">
+                  Select a table
+                </h2>
+                <p className="text-sm text-muted-foreground/70">
+                  Choose a table from the sidebar to browse its data
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dialogs */}
+        <AddRecordDialog
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          columnMeta={tableData.columnMeta}
+          onSubmit={tableData.insertRow}
+        />
+
+        <EditRecordDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          columnMeta={tableData.columnMeta}
+          row={editingRow}
+          primaryKeys={tableData.primaryKeys}
+          onSubmit={tableData.updateRow}
+        />
+
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          count={deletingRows.length}
+          onConfirm={handleConfirmDelete}
+        />
       </div>
-    </div>
+    </TooltipProvider>
   )
+}
+
+/** Generate page numbers with ellipsis for pagination */
+function generatePageNumbers(
+  current: number,
+  total: number
+): (number | "...")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  const pages: (number | "...")[] = [1]
+
+  if (current > 3) {
+    pages.push("...")
+  }
+
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+
+  if (current < total - 2) {
+    pages.push("...")
+  }
+
+  pages.push(total)
+
+  return pages
 }
