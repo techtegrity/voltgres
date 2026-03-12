@@ -148,6 +148,28 @@ export async function updatePgUser(
   }
 }
 
+// Get a short-lived pool connected to a specific database, inheriting
+// credentials from an existing pool (pool.options drops password/ssl,
+// so we grab them from an actual client connection).
+async function getDbPool(pool: Pool, dbName: string): Promise<Pool> {
+  const client = await pool.connect()
+  try {
+    const { host, port, user, password, ssl } = client as any
+    const { Pool: PgPool } = await import("pg")
+    return new PgPool({
+      host,
+      port,
+      user,
+      password,
+      database: dbName,
+      max: 1,
+      ssl: ssl ? { rejectUnauthorized: false } : undefined,
+    })
+  } finally {
+    client.release()
+  }
+}
+
 export async function grantAccess(
   pool: Pool,
   username: string,
@@ -162,15 +184,7 @@ export async function grantAccess(
 
   // Also grant usage + create on public schema (PG 15+ revoked public CREATE by default)
   // We need a connection to the target DB for schema-level grants
-  const { Pool: PgPool } = await import("pg")
-  const dbPool = new PgPool({
-    host: pool.options.host as string,
-    port: pool.options.port as number,
-    user: pool.options.user as string,
-    password: pool.options.password as string,
-    database: safeDbName,
-    max: 1,
-  })
+  const dbPool = await getDbPool(pool, safeDbName)
   try {
     await dbPool.query(`GRANT ALL ON SCHEMA public TO "${safeUsername}"`)
     await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${safeUsername}"`)
@@ -190,15 +204,7 @@ export async function revokeAccess(
   await pool.query(`REVOKE ALL PRIVILEGES ON DATABASE "${safeDbName}" FROM "${safeUsername}"`)
 
   // Also revoke schema-level privileges
-  const { Pool: PgPool } = await import("pg")
-  const dbPool = new PgPool({
-    host: pool.options.host as string,
-    port: pool.options.port as number,
-    user: pool.options.user as string,
-    password: pool.options.password as string,
-    database: safeDbName,
-    max: 1,
-  })
+  const dbPool = await getDbPool(pool, safeDbName)
   try {
     await dbPool.query(`REVOKE ALL ON SCHEMA public FROM "${safeUsername}"`)
     await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM "${safeUsername}"`)
