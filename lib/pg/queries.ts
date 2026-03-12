@@ -51,6 +51,10 @@ export async function createDatabase(
     `CREATE DATABASE "${safeName}" OWNER "${safeOwner}" ENCODING '${safeEncoding}'`
   )
 
+  // Revoke default CONNECT from public so only explicitly granted users
+  // (and the owner) can access this database.
+  await pool.query(`REVOKE CONNECT ON DATABASE "${safeName}" FROM PUBLIC`)
+
   // Grant full database-level privileges (CREATE lets owner create new schemas,
   // e.g. Drizzle's "drizzle" migration-tracking schema).
   await pool.query(`GRANT ALL PRIVILEGES ON DATABASE "${safeName}" TO "${safeOwner}"`)
@@ -290,6 +294,19 @@ export async function revokeAccess(
     await dbPool.query(`ALTER DEFAULT PRIVILEGES REVOKE ALL ON SEQUENCES FROM "${safeUsername}"`)
   } finally {
     await dbPool.end()
+  }
+}
+
+// Revoke default CONNECT from public on ALL existing non-template databases.
+// This ensures only explicitly granted users (and superusers/owners) can connect.
+// Safe to run multiple times — revoking an already-revoked privilege is a no-op.
+export async function lockdownPublicConnect(pool: Pool) {
+  const { rows } = await pool.query(`
+    SELECT datname FROM pg_database WHERE datistemplate = false
+  `)
+  for (const row of rows) {
+    const safeName = (row.datname as string).replace(/[^a-zA-Z0-9_]/g, "_")
+    await pool.query(`REVOKE CONNECT ON DATABASE "${safeName}" FROM PUBLIC`)
   }
 }
 

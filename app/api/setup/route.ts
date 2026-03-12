@@ -3,6 +3,8 @@ import { db } from "@/lib/db"
 import { user, connectionConfig } from "@/lib/db/schema"
 import { auth } from "@/lib/auth"
 import { count, eq } from "drizzle-orm"
+import { getPool, type PgConnectionConfig } from "@/lib/pg/connection"
+import { lockdownPublicConnect } from "@/lib/pg/queries"
 
 export async function GET() {
   const [result] = await db.select({ count: count() }).from(user)
@@ -52,18 +54,32 @@ export async function POST(req: NextRequest) {
         .limit(1)
 
       if (newUser) {
+        const configId = crypto.randomUUID()
+        const pgPort = parseInt(process.env.POSTGRES_PORT || "5432", 10)
+        const pgUser = process.env.POSTGRES_USER || "postgres"
         const now = new Date()
         await db.insert(connectionConfig).values({
-          id: crypto.randomUUID(),
+          id: configId,
           host: pgHost,
-          port: parseInt(process.env.POSTGRES_PORT || "5432", 10),
-          username: process.env.POSTGRES_USER || "postgres",
+          port: pgPort,
+          username: pgUser,
           password: pgPassword,
           sslMode: "disable",
           createdAt: now,
           updatedAt: now,
           userId: newUser.id,
         })
+
+        // Lock down existing databases so only explicitly granted users can connect
+        const pgConfig: PgConnectionConfig = {
+          host: pgHost,
+          port: pgPort,
+          user: pgUser,
+          password: pgPassword,
+          ssl: false,
+        }
+        const pool = getPool(configId, pgConfig)
+        await lockdownPublicConnect(pool)
       }
     }
 
