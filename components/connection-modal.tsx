@@ -99,7 +99,7 @@ export function ConnectionModal({
   const userManuallySelected = useRef(false)
   const [format, setFormat] = useState<ConnectionFormat>("uri")
   const [showPassword, setShowPassword] = useState(false)
-  const [sslEnabled, setSslEnabled] = useState(false)
+  const [sslEnabled, setSslEnabled] = useState(true)
   const [copied, setCopied] = useState(false)
   const [publicHost, setPublicHost] = useState("")
   const [publicPort, setPublicPort] = useState(5432)
@@ -412,7 +412,7 @@ export function ConnectionModal({
           </Button>
           <Button
             variant="outline"
-            className="gap-2"
+            className="gap-2 dark:border-border dark:bg-muted/50 dark:hover:bg-muted"
             onClick={() => setShowPassword(!showPassword)}
             disabled={!hasPassword}
           >
