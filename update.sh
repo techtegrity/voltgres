@@ -54,9 +54,9 @@ chmod +x pg-entrypoint.sh
 echo "Rebuilding and restarting..."
 existing_domain=$(grep '^DOMAIN=' .env | cut -d= -f2-)
 if [ -n "$existing_domain" ]; then
-    docker compose --profile https up -d --build
+    docker compose --profile https up -d --build --force-recreate
 else
-    docker compose up -d --build
+    docker compose up -d --build --force-recreate
 fi
 
 echo ""

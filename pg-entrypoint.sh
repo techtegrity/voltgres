@@ -7,7 +7,7 @@ if ! command -v openssl >/dev/null 2>&1; then
 fi
 
 SSL_DIR="/var/lib/postgresql/ssl"
-CADDY_CERT_BASE="/caddy-data/certificates/acme-v02.api.letsencrypt.org-directory"
+CADDY_CERT_BASE="/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory"
 
 mkdir -p "$SSL_DIR"
 
