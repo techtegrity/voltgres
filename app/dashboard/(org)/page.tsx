@@ -148,6 +148,9 @@ export default function DatabasesPage() {
         encoding: newDbEncoding,
       })
 
+      // Refresh users so their databases arrays include the newly created database
+      await refreshUsers()
+
       setIsCreateOpen(false)
     } catch (err) {
       setCreateError((err as Error).message || "Failed to create database")
