@@ -45,11 +45,10 @@ generate_self_signed() {
 
     CN="${DOMAIN:-voltgres-postgres}"
     echo "[pg-ssl] Generating self-signed certificate (CN=$CN)..."
-    openssl req -new -x509 -days 3650 -nodes -text \
+    openssl req -new -x509 -days 3650 -nodes \
         -out "$SSL_DIR/server.crt" \
         -keyout "$SSL_DIR/server.key" \
-        -subj "/CN=$CN" \
-        2>/dev/null
+        -subj "/CN=$CN"
     chmod 600 "$SSL_DIR/server.key"
     chown postgres:postgres "$SSL_DIR/server.crt" "$SSL_DIR/server.key"
     echo "[pg-ssl] Self-signed certificate generated"
