@@ -111,6 +111,16 @@ export const storageConfig = sqliteTable("storage_config", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 })
 
+export const accessRule = sqliteTable("access_rule", {
+  id: text("id").primaryKey(),
+  type: text("type", { enum: ["ip", "cidr", "header_secret"] }).notNull(),
+  value: text("value").notNull(),
+  description: text("description").default(""),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+})
+
 export const snapshot = sqliteTable("snapshot", {
   id: text("id").primaryKey(),
   database: text("database").notNull(),
