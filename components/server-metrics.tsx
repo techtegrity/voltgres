@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useSystemMetrics, type MetricsSnapshot } from "@/hooks/use-system-metrics"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Cpu, HardDrive, MemoryStick, Clock } from "lucide-react"
@@ -16,6 +17,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { DiskUsageDialog } from "@/components/disk-usage-dialog"
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B"
@@ -36,8 +38,8 @@ function formatUptime(seconds: number): string {
 
 function GaugeRing({
   percent,
-  size = 56,
-  strokeWidth = 5,
+  size = 48,
+  strokeWidth = 4.5,
   color,
 }: {
   percent: number
@@ -78,7 +80,7 @@ function GaugeRing({
         y={size / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-foreground text-[11px] font-semibold"
+        className="fill-foreground text-[10px] font-semibold"
       >
         {Math.round(percent)}%
       </text>
@@ -105,15 +107,16 @@ const chartConfig = {
 
 export function ServerMetrics() {
   const { metrics, history, loading } = useSystemMetrics(5000)
+  const [diskDialogOpen, setDiskDialogOpen] = useState(false)
 
   if (loading || !metrics) {
     return (
       <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Server</CardTitle>
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-base">Server</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[140px] flex items-center justify-center">
+        <CardContent className="px-4 pb-4">
+          <div className="h-[80px] flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
           </div>
         </CardContent>
@@ -122,101 +125,115 @@ export function ServerMetrics() {
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Server</CardTitle>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            <span>up {formatUptime(metrics.uptime)}</span>
+    <>
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-0 pt-3 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Server</CardTitle>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="truncate max-w-[200px] hidden sm:inline" title={metrics.cpu.model}>
+                {metrics.cpu.model}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                up {formatUptime(metrics.uptime)}
+              </span>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Gauges row */}
-        <div className="grid grid-cols-3 gap-4">
-          <GaugeItem
-            icon={<Cpu className="w-3.5 h-3.5" />}
-            label="CPU"
-            percent={metrics.cpu.usagePercent}
-            detail={`${metrics.cpu.cores} cores`}
-          />
-          <GaugeItem
-            icon={<MemoryStick className="w-3.5 h-3.5" />}
-            label="Memory"
-            percent={metrics.memory.usagePercent}
-            detail={`${formatBytes(metrics.memory.usedBytes)} / ${formatBytes(metrics.memory.totalBytes)}`}
-          />
-          <GaugeItem
-            icon={<HardDrive className="w-3.5 h-3.5" />}
-            label="Disk"
-            percent={metrics.disk.usagePercent}
-            detail={`${formatBytes(metrics.disk.usedBytes)} / ${formatBytes(metrics.disk.totalBytes)}`}
-          />
-        </div>
-
-        {/* CPU / Memory chart */}
-        {history.length > 1 && (
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">
-              CPU &amp; Memory (last {history.length} samples)
-            </p>
-            <ChartContainer config={chartConfig} className="h-[100px] w-full">
-              <AreaChart data={formatHistory(history)}>
-                <defs>
-                  <linearGradient id="fillCpu" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-cpuPercent)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="var(--color-cpuPercent)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="fillMem" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-memPercent)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="var(--color-memPercent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="time" tick={false} axisLine={false} tickLine={false} />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={28}
-                  tickFormatter={(v) => `${v}%`}
+        </CardHeader>
+        <CardContent className="px-4 pb-3 pt-2">
+          <div className="flex items-stretch gap-4">
+            {/* Gauges column — compact row */}
+            <div className="flex items-center gap-4 shrink-0">
+              <GaugeItem
+                icon={<Cpu className="w-3 h-3" />}
+                label="CPU"
+                percent={metrics.cpu.usagePercent}
+                detail={`${metrics.cpu.cores} cores`}
+              />
+              <GaugeItem
+                icon={<MemoryStick className="w-3 h-3" />}
+                label="Mem"
+                percent={metrics.memory.usagePercent}
+                detail={`${formatBytes(metrics.memory.usedBytes)} / ${formatBytes(metrics.memory.totalBytes)}`}
+              />
+              <button
+                type="button"
+                onClick={() => setDiskDialogOpen(true)}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md transition-colors hover:bg-muted/50 -m-1.5 p-1.5 cursor-pointer"
+                title="Click to view disk usage breakdown"
+              >
+                <GaugeItem
+                  icon={<HardDrive className="w-3 h-3" />}
+                  label="Disk"
+                  percent={metrics.disk.usagePercent}
+                  detail={`${formatBytes(metrics.disk.usedBytes)} / ${formatBytes(metrics.disk.totalBytes)}`}
+                  clickable
                 />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value) => `${value}%`}
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px bg-border shrink-0 self-stretch" />
+
+            {/* Chart — fills remaining space */}
+            {history.length > 1 && (
+              <div className="flex-1 min-w-0">
+                <ChartContainer config={chartConfig} className="h-[80px] w-full">
+                  <AreaChart data={formatHistory(history)}>
+                    <defs>
+                      <linearGradient id="fillCpu" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-cpuPercent)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--color-cpuPercent)" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="fillMem" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-memPercent)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--color-memPercent)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis dataKey="time" tick={false} axisLine={false} tickLine={false} height={0} />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fontSize: 9 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      tickFormatter={(v) => `${v}%`}
                     />
-                  }
-                />
-                <Area
-                  dataKey="cpuPercent"
-                  type="monotone"
-                  fill="url(#fillCpu)"
-                  stroke="var(--color-cpuPercent)"
-                  strokeWidth={1.5}
-                  dot={false}
-                />
-                <Area
-                  dataKey="memPercent"
-                  type="monotone"
-                  fill="url(#fillMem)"
-                  stroke="var(--color-memPercent)"
-                  strokeWidth={1.5}
-                  dot={false}
-                />
-              </AreaChart>
-            </ChartContainer>
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value) => `${value}%`}
+                        />
+                      }
+                    />
+                    <Area
+                      dataKey="cpuPercent"
+                      type="monotone"
+                      fill="url(#fillCpu)"
+                      stroke="var(--color-cpuPercent)"
+                      strokeWidth={1.5}
+                      dot={false}
+                    />
+                    <Area
+                      dataKey="memPercent"
+                      type="monotone"
+                      fill="url(#fillMem)"
+                      stroke="var(--color-memPercent)"
+                      strokeWidth={1.5}
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              </div>
+            )}
           </div>
-        )}
+        </CardContent>
+      </Card>
 
-        {/* CPU info line */}
-        <p className="text-[11px] text-muted-foreground truncate" title={metrics.cpu.model}>
-          {metrics.cpu.model} &middot; Load: {metrics.cpu.loadAvg.join(" / ")}
-        </p>
-      </CardContent>
-    </Card>
+      <DiskUsageDialog open={diskDialogOpen} onOpenChange={setDiskDialogOpen} />
+    </>
   )
 }
 
@@ -225,20 +242,22 @@ function GaugeItem({
   label,
   percent,
   detail,
+  clickable,
 }: {
   icon: React.ReactNode
   label: string
   percent: number
   detail: string
+  clickable?: boolean
 }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-1">
       <GaugeRing percent={percent} color={getColor(percent)} />
-      <div className="flex items-center gap-1 text-xs font-medium text-foreground">
+      <div className={`flex items-center gap-1 text-[11px] font-medium text-foreground ${clickable ? "underline decoration-dotted underline-offset-2 decoration-muted-foreground/50" : ""}`}>
         {icon}
         {label}
       </div>
-      <span className="text-[10px] text-muted-foreground text-center leading-tight">
+      <span className="text-[9px] text-muted-foreground text-center leading-tight">
         {detail}
       </span>
     </div>

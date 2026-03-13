@@ -204,6 +204,21 @@ export interface SystemMetrics {
   timestamp: number
 }
 
+export interface DiskUsageEntry {
+  path: string
+  label: string
+  bytes: number
+  percent: number
+}
+
+export interface DiskUsageData {
+  totalBytes: number
+  usedBytes: number
+  freeBytes: number
+  entries: DiskUsageEntry[]
+  pgDataBytes: number
+}
+
 export const api = {
   databases: {
     list: () => apiFetch<DatabaseRow[]>("/api/pg/databases"),
@@ -421,6 +436,7 @@ export const api = {
 
   system: {
     metrics: () => apiFetch<SystemMetrics>("/api/system/metrics"),
+    diskUsage: () => apiFetch<DiskUsageData>("/api/system/disk-usage"),
   },
 
   storage: {
