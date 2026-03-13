@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import {
   Users,
   Plus,
@@ -35,10 +36,14 @@ import {
   Database,
   Edit,
   Loader2,
+  Link2,
+  Blocks,
+  Clock,
+  Crown,
 } from "lucide-react"
 
 export default function UsersPage() {
-  const { users, loading, addUser, deleteUser, updateUser, grantAccess, revokeAccess } = usePgUsers()
+  const { users, privileges, loading, addUser, deleteUser, updateUser, grantAccess, revokeAccess } = usePgUsers()
   const { databases } = useDatabases()
   const [newUsername, setNewUsername] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -287,20 +292,64 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {user.databases.slice(0, 3).map((db) => (
-                            <Badge
-                              key={db}
-                              variant="secondary"
-                              className="text-xs font-mono"
-                            >
-                              {db}
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.superuser ? (
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <Shield className="w-3 h-3" />
+                              All Databases
                             </Badge>
-                          ))}
-                          {user.databases.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{user.databases.length - 3} more
-                            </Badge>
+                          ) : (
+                            <>
+                              {(privileges[user.username] || []).slice(0, 4).map((p) => (
+                                <Tooltip key={p.database}>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs font-mono gap-1 cursor-default"
+                                    >
+                                      {p.is_owner && <Crown className="w-3 h-3 text-amber-500" />}
+                                      {p.database}
+                                      <span className="flex gap-0.5 ml-0.5">
+                                        {p.connect && <span className="text-primary font-bold" title="Connect">C</span>}
+                                        {p.create && <span className="text-chart-3 font-bold" title="Create">W</span>}
+                                        {p.temporary && <span className="text-chart-2 font-bold" title="Temporary">T</span>}
+                                      </span>
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    <div className="space-y-1">
+                                      <p className="font-medium font-mono">{p.database}</p>
+                                      {p.is_owner && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Crown className="w-3 h-3 text-amber-500" />
+                                          <span>Owner</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1.5">
+                                        <Link2 className="w-3 h-3" />
+                                        <span>Connect: {p.connect ? "Yes" : "No"}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <Blocks className="w-3 h-3" />
+                                        <span>Create: {p.create ? "Yes" : "No"}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <Clock className="w-3 h-3" />
+                                        <span>Temporary: {p.temporary ? "Yes" : "No"}</span>
+                                      </div>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                              {(privileges[user.username] || []).length > 4 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  +{(privileges[user.username] || []).length - 4} more
+                                </Badge>
+                              )}
+                              {!(privileges[user.username] || []).length && (
+                                <span className="text-xs text-muted-foreground">No access</span>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>

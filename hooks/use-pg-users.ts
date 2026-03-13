@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { api, type PgUserRow } from "@/lib/api-client"
+import { api, type PgUserRow, type UserDatabasePrivileges } from "@/lib/api-client"
+
+export type PrivilegesByUser = Record<string, UserDatabasePrivileges[]>
 
 export function usePgUsers(dbFilter?: string) {
   const [users, setUsers] = useState<PgUserRow[]>([])
+  const [privileges, setPrivileges] = useState<PrivilegesByUser>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -12,12 +15,22 @@ export function usePgUsers(dbFilter?: string) {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.users.list()
+      const [data, privData] = await Promise.all([
+        api.users.list(),
+        api.users.privileges(),
+      ])
       if (dbFilter) {
         setUsers(data.filter((u) => u.databases.includes(dbFilter)))
       } else {
         setUsers(data)
       }
+      // Group privileges by username
+      const grouped: PrivilegesByUser = {}
+      for (const p of privData) {
+        if (!grouped[p.username]) grouped[p.username] = []
+        grouped[p.username].push(p)
+      }
+      setPrivileges(grouped)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -85,6 +98,7 @@ export function usePgUsers(dbFilter?: string) {
 
   return {
     users,
+    privileges,
     loading,
     error,
     refresh,
