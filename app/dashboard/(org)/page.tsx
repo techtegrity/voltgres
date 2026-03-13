@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useDatabases } from "@/hooks/use-databases"
 import { usePgUsers } from "@/hooks/use-pg-users"
@@ -49,6 +49,9 @@ import {
   Users,
   CheckCircle2,
   Activity,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react"
 
 function formatBytes(bytes: number) {
@@ -80,6 +83,55 @@ export default function DatabasesPage() {
   const [copiedPassword, setCopiedPassword] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string>("name")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortColumn(column)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedDatabases = useMemo(() => {
+    const sorted = [...databases].sort((a, b) => {
+      let cmp = 0
+      switch (sortColumn) {
+        case "name":
+          cmp = a.name.localeCompare(b.name)
+          break
+        case "owner":
+          cmp = a.owner.localeCompare(b.owner)
+          break
+        case "size":
+          cmp = a.size_bytes - b.size_bytes
+          break
+        case "conns":
+          cmp = a.active_connections - b.active_connections
+          break
+        case "transactions":
+          cmp = (a.xact_commit + a.xact_rollback) - (b.xact_commit + b.xact_rollback)
+          break
+        case "cache":
+          cmp = Number(a.cache_hit_ratio) - Number(b.cache_hit_ratio)
+          break
+        case "reads":
+          cmp = a.tup_fetched - b.tup_fetched
+          break
+        case "writes":
+          cmp = (a.tup_inserted + a.tup_updated + a.tup_deleted) - (b.tup_inserted + b.tup_updated + b.tup_deleted)
+          break
+        default:
+          cmp = 0
+      }
+      return sortDirection === "asc" ? cmp : -cmp
+    })
+    return sorted
+  }, [databases, sortColumn, sortDirection])
 
   // Track passwords for recently created users (sessionStorage-backed)
   const { passwords: knownPasswords, setPassword: setKnownPassword } = useKnownPasswords()
@@ -381,34 +433,41 @@ export default function DatabasesPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    Name
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden md:table-cell">
-                    Owner
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    Size
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden sm:table-cell">
-                    Conns
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">
-                    Transactions
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">
-                    Cache Hit
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground hidden xl:table-cell">
-                    Rows R / W
-                  </th>
+                  {[
+                    { key: "name", label: "Name", className: "" },
+                    { key: "size", label: "Size", className: "" },
+                    { key: "conns", label: "Conns", className: "hidden sm:table-cell" },
+                    { key: "transactions", label: "Transactions", className: "hidden lg:table-cell" },
+                    { key: "cache", label: "Cache Hit", className: "hidden lg:table-cell" },
+                    { key: "reads", label: "Reads", className: "hidden xl:table-cell" },
+                    { key: "writes", label: "Writes", className: "hidden xl:table-cell" },
+                  ].map((col) => (
+                    <th
+                      key={col.key}
+                      className={`text-left py-3 px-4 text-sm font-medium text-muted-foreground select-none cursor-pointer hover:text-foreground transition-colors ${col.className}`}
+                      onClick={() => handleSort(col.key)}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {sortColumn === col.key ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="w-3 h-3" />
+                          ) : (
+                            <ArrowDown className="w-3 h-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                        )}
+                      </span>
+                    </th>
+                  ))}
                   <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {databases.map((db) => (
+                {sortedDatabases.map((db) => (
                   <tr
                     key={db.name}
                     className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
@@ -419,12 +478,16 @@ export default function DatabasesPage() {
                         <div className="p-2 rounded-md bg-primary/10">
                           <Database className="w-4 h-4 text-primary" />
                         </div>
-                        <span className="font-medium text-foreground font-mono">
-                          {db.name}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground font-mono">
+                            {db.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {db.owner}
+                          </span>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-muted-foreground hidden md:table-cell">{db.owner}</td>
                     <td className="py-4 px-4 text-muted-foreground">
                       {formatBytes(db.size_bytes)}
                     </td>
@@ -459,8 +522,13 @@ export default function DatabasesPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground hidden xl:table-cell">
-                      <span title={`Returned: ${db.tup_returned.toLocaleString()} / Fetched: ${db.tup_fetched.toLocaleString()} | Inserted: ${db.tup_inserted.toLocaleString()} / Updated: ${db.tup_updated.toLocaleString()} / Deleted: ${db.tup_deleted.toLocaleString()}`}>
-                        {formatCompact(db.tup_fetched)} / {formatCompact(db.tup_inserted + db.tup_updated + db.tup_deleted)}
+                      <span title={`Returned: ${db.tup_returned.toLocaleString()} / Fetched: ${db.tup_fetched.toLocaleString()}`}>
+                        {formatCompact(db.tup_fetched)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-muted-foreground hidden xl:table-cell">
+                      <span title={`Inserted: ${db.tup_inserted.toLocaleString()} / Updated: ${db.tup_updated.toLocaleString()} / Deleted: ${db.tup_deleted.toLocaleString()}`}>
+                        {formatCompact(db.tup_inserted + db.tup_updated + db.tup_deleted)}
                       </span>
                     </td>
                     <td className="py-4 px-4 text-right">
