@@ -57,6 +57,7 @@ export default function DatabaseSQLPage({
   }
 
   const exampleQueries = [
+    { label: "Select all", query: 'SELECT * FROM "user" LIMIT 10;' },
     { label: "Show tables", query: "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;" },
     { label: "Table info", query: "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'TABLE_NAME' ORDER BY ordinal_position;" },
     { label: "Table sizes", query: "SELECT relname AS table, pg_size_pretty(pg_total_relation_size(relid)) AS size FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC;" },

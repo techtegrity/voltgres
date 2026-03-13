@@ -28,6 +28,10 @@ function createTheme(isDark: boolean) {
         fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
         padding: "12px 0",
         caretColor: "var(--foreground)",
+        minHeight: "4lh",
+      },
+      ".cm-scroller": {
+        minHeight: "4lh",
       },
       ".cm-cursor": {
         borderLeftColor: "var(--foreground)",
