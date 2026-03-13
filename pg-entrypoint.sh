@@ -105,8 +105,9 @@ copy_le_certs || generate_self_signed
 # Start background watcher for cert updates
 start_cert_watcher
 
-# Start PostgreSQL with SSL enabled
+# Start PostgreSQL with SSL and pg_stat_statements enabled
 exec docker-entrypoint.sh "$@" \
     -c ssl=on \
     -c ssl_cert_file="$SSL_DIR/server.crt" \
-    -c ssl_key_file="$SSL_DIR/server.key"
+    -c ssl_key_file="$SSL_DIR/server.key" \
+    -c shared_preload_libraries=pg_stat_statements
