@@ -347,6 +347,14 @@ export const api = {
       apiFetch(`/api/pg/databases/${encodeURIComponent(name)}`, {
         method: "DELETE",
       }),
+    checkOwnership: (name: string) =>
+      apiFetch<{ misconfiguredCount: number }>(
+        `/api/pg/databases/${encodeURIComponent(name)}/fix-ownership`
+      ),
+    fixOwnership: (name: string) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/fix-ownership`, {
+        method: "POST",
+      }),
     privileges: (name: string) =>
       apiFetch<DatabaseUserPrivileges[]>(
         `/api/pg/databases/${encodeURIComponent(name)}/privileges`

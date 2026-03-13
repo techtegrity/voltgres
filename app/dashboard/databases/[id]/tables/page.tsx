@@ -77,7 +77,6 @@ export default function DatabaseTablesPage({
     } else {
       setSelectedSchema(schema)
       setSelectedTable(name)
-      setActiveTab("content")
     }
   }
 
