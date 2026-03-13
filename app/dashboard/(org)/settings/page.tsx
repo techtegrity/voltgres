@@ -541,9 +541,9 @@ function AccessControlCard() {
             <Shield className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1">
-            <CardTitle>Access Control</CardTitle>
+            <CardTitle>App Access Control</CardTitle>
             <CardDescription>
-              Restrict access to this Voltgres instance by IP address or secret token
+              Restrict who can access this dashboard and API by IP address or secret token. Database-level access is managed per-database.
             </CardDescription>
           </div>
           {hasEnabledRules && (
@@ -556,8 +556,8 @@ function AccessControlCard() {
       <CardContent>
         {/* Info about how it works */}
         <div className="text-sm text-muted-foreground mb-4 space-y-1">
-          <p>When rules exist, only matching IPs or requests with the correct header token can access this instance.</p>
-          <p>If all rules are disabled or deleted, access control is turned off automatically.</p>
+          <p>These rules control who can access the Voltgres dashboard and API. They do not affect direct PostgreSQL connections.</p>
+          <p>When rules exist, only matching IPs or requests with the correct header token are allowed. If all rules are disabled or deleted, access control is turned off automatically.</p>
         </div>
 
         {/* Warning when active */}
@@ -565,7 +565,7 @@ function AccessControlCard() {
           <Alert className="mb-4 border-amber-600/30 bg-amber-600/5">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-600">
-              Access control is active. Make sure your current IP or token is in the allowlist to avoid being locked out.
+              App access control is active. Make sure your current IP or token is in the allowlist to avoid being locked out of the dashboard.
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <span className="block mt-1 text-xs text-amber-600/70">
                   Emergency bypass: set <code className="bg-amber-600/10 px-1 rounded">BYPASS_TOKEN</code> env var, then access with <code className="bg-amber-600/10 px-1 rounded">?bypass=your-token</code>
@@ -615,8 +615,8 @@ function AccessControlCard() {
         {rules.length === 0 && !showAddForm && (
           <div className="text-center py-8 border border-dashed border-border rounded-lg mb-4">
             <Shield className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No access rules configured</p>
-            <p className="text-xs text-muted-foreground mt-1">All traffic is currently allowed</p>
+            <p className="text-sm text-muted-foreground">No app access rules configured</p>
+            <p className="text-xs text-muted-foreground mt-1">All traffic to the dashboard and API is currently allowed</p>
           </div>
         )}
 
