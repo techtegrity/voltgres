@@ -180,6 +180,30 @@ export interface SnapshotData {
   userId: string
 }
 
+export interface SystemMetrics {
+  cpu: {
+    cores: number
+    model: string
+    usagePercent: number
+    loadAvg: number[]
+  }
+  memory: {
+    totalBytes: number
+    usedBytes: number
+    freeBytes: number
+    usagePercent: number
+  }
+  disk: {
+    totalBytes: number
+    usedBytes: number
+    freeBytes: number
+    usagePercent: number
+    mountPoint: string
+  }
+  uptime: number
+  timestamp: number
+}
+
 export const api = {
   databases: {
     list: () => apiFetch<DatabaseRow[]>("/api/pg/databases"),
@@ -393,6 +417,10 @@ export const api = {
 
   server: {
     info: () => apiFetch<ServerInfo>("/api/pg/server-info"),
+  },
+
+  system: {
+    metrics: () => apiFetch<SystemMetrics>("/api/system/metrics"),
   },
 
   storage: {

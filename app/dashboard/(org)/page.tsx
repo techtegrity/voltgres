@@ -35,6 +35,7 @@ import {
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { ConnectionModal } from "@/components/connection-modal"
 import { DeleteDatabaseDialog } from "@/components/delete-database-dialog"
+import { ServerMetrics } from "@/components/server-metrics"
 import { generatePassword } from "@/lib/generate-password"
 import {
   Database,
@@ -361,6 +362,11 @@ export default function DatabasesPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
         onDeleted={() => { setDeleteTarget(null); refresh() }}
       />
+
+      {/* Server Metrics */}
+      <div className="mb-6">
+        <ServerMetrics />
+      </div>
 
       {/* Database List */}
       <Card className="bg-card border-border">
