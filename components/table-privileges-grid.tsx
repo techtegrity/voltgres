@@ -85,15 +85,15 @@ export function TablePrivilegesGrid({ dbName }: Props) {
   const users = [...new Set(rows.map((r) => r.username))].sort()
   const schemas = [...new Set(rows.map((r) => r.schema))].sort()
 
-  // Auto-select first user if none selected
+  // Auto-select database owner as default user
   useEffect(() => {
     if (!selectedUser && users.length > 0) {
-      // Prefer a non-superuser, non-postgres user
-      const regular = users.find((u) => {
-        const row = rows.find((r) => r.username === u)
-        return row && !row.superuser && u !== "postgres"
-      })
-      setSelectedUser(regular || users[0])
+      const dbOwner = rows.find((r) => r.is_table_owner)?.table_owner
+      if (dbOwner && users.includes(dbOwner)) {
+        setSelectedUser(dbOwner)
+      } else {
+        setSelectedUser(users[0])
+      }
     }
   }, [users, selectedUser, rows])
 
