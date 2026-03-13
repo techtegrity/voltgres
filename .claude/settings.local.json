@@ -10,7 +10,11 @@
       "Bash(cat '/Users/chris/Repos/mine/Techtegrity/voltgres/voltgres/app/dashboard/\\(org\\)/page.tsx')",
       "Bash(echo \"exit: $?\")",
       "Bash(chmod +x /Users/chris/Repos/mine/Techtegrity/voltgres/voltgres/.git/hooks/pre-commit)",
-      "Bash(bash .git/hooks/pre-commit)"
+      "Bash(bash .git/hooks/pre-commit)",
+      "WebFetch(domain:caddyserver.com)",
+      "WebSearch",
+      "WebFetch(domain:caddy.community)",
+      "Bash(grep -r \"ALL DATABASES\\\\|ALL databases\\\\|every.*database\" /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.ts --include=*.tsx --include=*.js)"
     ]
   }
 }
