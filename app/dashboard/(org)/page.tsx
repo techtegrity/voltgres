@@ -43,7 +43,6 @@ import {
   Trash2,
   Copy,
   Link,
-  ExternalLink,
   Loader2,
   UserPlus,
   Users,
@@ -460,15 +459,6 @@ export default function DatabasesPage() {
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => router.push(`/dashboard/databases/${encodeURIComponent(db.name)}`)}
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span className="hidden sm:inline">Open</span>
-                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
