@@ -15,7 +15,14 @@
       "WebSearch",
       "WebFetch(domain:caddy.community)",
       "Bash(grep -r \"ALL DATABASES\\\\|ALL databases\\\\|every.*database\" /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.ts --include=*.tsx --include=*.js)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:3000/api/config/storage/test -H \"Content-Type: application/json\" -d '{\"\"provider\"\":\"\"r2\"\",\"\"bucket\"\":\"\"test\"\",\"\"region\"\":\"\"auto\"\",\"\"endpoint\"\":\"\"https://example.r2.cloudflarestorage.com\"\",\"\"accessKeyId\"\":\"\"test\"\",\"\"secretAccessKey\"\":\"\"test\"\"}')"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:3000/api/config/storage/test -H \"Content-Type: application/json\" -d '{\"\"provider\"\":\"\"r2\"\",\"\"bucket\"\":\"\"test\"\",\"\"region\"\":\"\"auto\"\",\"\"endpoint\"\":\"\"https://example.r2.cloudflarestorage.com\"\",\"\"accessKeyId\"\":\"\"test\"\",\"\"secretAccessKey\"\":\"\"test\"\"}')",
+      "Bash(find /Users/chris/Repos/mine/Techtegrity/voltgres -type f \\\\\\(-name *.sh -o -name docker-compose* -o -name Dockerfile* -o -name pg_hba.conf -o -name postgresql.conf -o -name *.tf -o -name *.yml -o -name *.yaml \\\\\\))",
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.sh)",
+      "Bash(find /Users/chris/Repos/mine/Techtegrity/voltgres -path ./node_modules -prune -o -type f -name *dashboard* -print)",
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/app/dashboard/\\\\\\(org\\\\\\)/)",
+      "Bash(cat \"/Users/chris/Repos/mine/Techtegrity/voltgres/app/dashboard/\\(org\\)/layout.tsx\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(git add:*)"
     ]
   }
 }
