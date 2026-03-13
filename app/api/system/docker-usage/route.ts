@@ -30,7 +30,8 @@ export async function GET() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     })
-  } catch {
+  } catch (err) {
+    console.log("[docker-usage] Docker not accessible:", (err as Error).message?.split("\n")[0])
     return NextResponse.json({ available: false })
   }
 

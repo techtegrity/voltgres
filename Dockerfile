@@ -41,17 +41,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/migrate.mjs ./migrate.mjs
 COPY --from=builder /app/drizzle ./drizzle
 
-# Install pg_dump/pg_restore for snapshots, docker-cli for disk management
-RUN apk add --no-cache postgresql16-client docker-cli
+# Install pg_dump/pg_restore for snapshots, docker-cli for disk management, su-exec for user switching
+RUN apk add --no-cache postgresql16-client docker-cli su-exec
 
 # Create data directory for SQLite and tmp for snapshots
 RUN mkdir -p /app/data /app/tmp && chown nextjs:nodejs /app/data /app/tmp
 
-# Copy startup script
-COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
+# Copy startup script (runs as root, drops to nextjs via su-exec)
+COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
-USER nextjs
+# Entrypoint runs as root to detect docker socket GID, then drops to nextjs
 
 EXPOSE 3000
 
