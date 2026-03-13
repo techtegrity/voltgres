@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Server, Info, HardDrive, Shield } from "lucide-react"
+import { Server, Info, HardDrive, Shield, DatabaseZap } from "lucide-react"
 
 const tabs = [
   { label: "Connection", href: "/dashboard/settings", icon: Server },
   { label: "Server Info", href: "/dashboard/settings/server", icon: Info },
   { label: "Storage", href: "/dashboard/settings/storage", icon: HardDrive },
   { label: "Access Control", href: "/dashboard/settings/access", icon: Shield },
+  { label: "App Data", href: "/dashboard/settings/app-data", icon: DatabaseZap },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

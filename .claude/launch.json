@@ -4,8 +4,12 @@
     {
       "name": "dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
-      "port": 3042
+      "runtimeArgs": ["dev", "--port", "3042"],
+      "port": 3042,
+      "env": {
+        "BETTER_AUTH_URL": "http://localhost:3042",
+        "NEXT_PUBLIC_APP_URL": "http://localhost:3042"
+      }
     }
   ]
 }
