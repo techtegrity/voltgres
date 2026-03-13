@@ -13,6 +13,25 @@ echo -e "${CYAN}${BOLD}  ⚡ Voltgres Installer${NC}"
 echo -e "  ${CYAN}PostgreSQL Manager${NC}"
 echo ""
 
+# Ensure swap exists on low-memory VPS (prevents OOM during Docker builds)
+if [[ "$OSTYPE" == "linux-gnu"* ]] && [ "$(id -u)" -eq 0 ]; then
+    if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ]; then
+        total_mem_mb=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
+        if [ "$total_mem_mb" -lt 4096 ]; then
+            echo -e "${YELLOW}Low memory detected (${total_mem_mb}MB). Creating 2GB swap file...${NC}"
+            fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+            chmod 600 /swapfile
+            mkswap /swapfile >/dev/null
+            swapon /swapfile
+            # Persist across reboots
+            if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            fi
+            echo -e "${GREEN}Swap enabled.${NC}"
+        fi
+    fi
+fi
+
 # Check Docker is installed
 if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}Docker is not installed.${NC}"

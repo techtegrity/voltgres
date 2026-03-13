@@ -13,6 +13,24 @@ echo ""
 echo -e "${CYAN}${BOLD}  ⚡ Voltgres Updater${NC}"
 echo ""
 
+# Ensure swap exists on low-memory VPS (prevents OOM during Docker builds)
+if [[ "$OSTYPE" == "linux-gnu"* ]] && [ "$(id -u)" -eq 0 ]; then
+    if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ]; then
+        total_mem_mb=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
+        if [ "$total_mem_mb" -lt 4096 ]; then
+            echo -e "${YELLOW}Low memory detected. Creating 2GB swap file...${NC}"
+            fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+            chmod 600 /swapfile
+            mkswap /swapfile >/dev/null
+            swapon /swapfile
+            if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            fi
+            echo -e "${GREEN}Swap enabled.${NC}"
+        fi
+    fi
+fi
+
 # Must be run from the voltgres directory
 if [ ! -f docker-compose.yml ]; then
     echo -e "${RED}Error: docker-compose.yml not found.${NC}"

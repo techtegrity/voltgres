@@ -3,8 +3,10 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* package-lock.json* yarn.lock* ./
+# Limit native compilation parallelism to prevent OOM on low-memory VPS
+ENV MAKEFLAGS="-j1"
 RUN \
-  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
+  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile --network-concurrency 1; \
   elif [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
   else npm install; \
