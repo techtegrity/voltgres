@@ -58,6 +58,30 @@ export interface DatabaseUserPrivileges {
   connection_limit: number
 }
 
+export interface UserDatabasePrivileges {
+  username: string
+  database: string
+  is_owner: boolean
+  superuser: boolean
+  connect: boolean
+  create: boolean
+  temporary: boolean
+}
+
+export interface ConnectionActivity {
+  pid: number
+  usename: string | null
+  application_name: string
+  client_addr: string | null
+  state: string | null
+  query: string | null
+  query_start: string | null
+  state_change: string | null
+  backend_start: string | null
+  wait_event_type: string | null
+  wait_event: string | null
+}
+
 export interface TableRow {
   name: string
   schema: string
@@ -187,6 +211,15 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    activity: (name: string) =>
+      apiFetch<ConnectionActivity[]>(
+        `/api/pg/databases/${encodeURIComponent(name)}/activity`
+      ),
+    terminateConnection: (name: string, pid: number) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/activity`, {
+        method: "DELETE",
+        body: JSON.stringify({ pid }),
+      }),
   },
 
   users: {
@@ -219,6 +252,8 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    privileges: () =>
+      apiFetch<UserDatabasePrivileges[]>("/api/pg/users/privileges"),
   },
 
   tables: {

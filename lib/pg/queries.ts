@@ -330,6 +330,44 @@ export async function getDatabasePrivileges(
   )
 }
 
+export interface UserDatabasePrivileges {
+  username: string
+  database: string
+  is_owner: boolean
+  superuser: boolean
+  connect: boolean
+  create: boolean
+  temporary: boolean
+}
+
+/**
+ * Get privilege breakdown for every user across all databases.
+ * Returns rows where the user has at least one privilege.
+ */
+export async function listAllUserPrivileges(
+  pool: Pool
+): Promise<UserDatabasePrivileges[]> {
+  const result = await pool.query(`
+    SELECT
+      r.rolname                                          AS username,
+      d.datname                                          AS database,
+      r.rolsuper                                         AS superuser,
+      (d.datdba = r.oid)                                 AS is_owner,
+      has_database_privilege(r.oid, d.oid, 'CONNECT')    AS connect,
+      has_database_privilege(r.oid, d.oid, 'CREATE')     AS "create",
+      has_database_privilege(r.oid, d.oid, 'TEMPORARY')  AS temporary
+    FROM pg_roles r
+    CROSS JOIN pg_database d
+    WHERE d.datistemplate = false
+      AND r.rolname NOT LIKE 'pg_%'
+    ORDER BY r.rolname, d.datname
+  `)
+  return result.rows.filter(
+    (r: UserDatabasePrivileges) =>
+      r.connect || r.create || r.temporary || r.is_owner || r.superuser
+  )
+}
+
 const VALID_DB_PRIVILEGES = ["CONNECT", "CREATE", "TEMPORARY"] as const
 type DbPrivilege = (typeof VALID_DB_PRIVILEGES)[number]
 
@@ -786,6 +824,60 @@ export async function deleteTableRows(
     params
   )
   return { deletedCount: result.rowCount ?? 0 }
+}
+
+// ── Connection activity (pg_stat_activity) ────────────────────────────
+
+export interface ConnectionActivity {
+  pid: number
+  usename: string | null
+  application_name: string
+  client_addr: string | null
+  state: string | null
+  query: string | null
+  query_start: string | null
+  state_change: string | null
+  backend_start: string | null
+  wait_event_type: string | null
+  wait_event: string | null
+}
+
+export async function listDatabaseActivity(
+  pool: Pool,
+  dbName: string
+): Promise<ConnectionActivity[]> {
+  const result = await pool.query(
+    `
+    SELECT
+      pid,
+      usename,
+      application_name,
+      client_addr::text,
+      state,
+      LEFT(query, 200) AS query,
+      query_start::text,
+      state_change::text,
+      backend_start::text,
+      wait_event_type,
+      wait_event
+    FROM pg_stat_activity
+    WHERE datname = $1
+      AND pid <> pg_backend_pid()
+    ORDER BY
+      CASE state WHEN 'active' THEN 0 WHEN 'idle in transaction' THEN 1 ELSE 2 END,
+      backend_start ASC
+    `,
+    [dbName]
+  )
+  return result.rows
+}
+
+export async function terminateBackend(pool: Pool, pid: number): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT pg_terminate_backend($1) AS terminated`,
+    [pid]
+  )
+  return result.rows[0]?.terminated ?? false
 }
 
 export async function getServerInfo(pool: Pool) {
