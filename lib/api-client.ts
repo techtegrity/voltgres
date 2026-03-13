@@ -272,6 +272,8 @@ export const api = {
   config: {
     getConnection: () =>
       apiFetch<ConnectionConfigData>("/api/config/connection"),
+    revealConnectionPassword: () =>
+      apiFetch<{ password: string }>("/api/config/connection/password"),
     updateConnection: (data: ConnectionConfigData) =>
       apiFetch("/api/config/connection", {
         method: "PUT",

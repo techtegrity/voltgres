@@ -148,7 +148,7 @@ export default function DatabaseDashboardPage({
         databases={databases}
         users={users}
         initialDatabase={dbName}
-        adminPassword={config?.password}
+        adminUsername={config?.username}
         knownPasswords={knownPasswords}
         onUsersRefresh={refreshUsers}
         onPasswordReset={(username, password) =>

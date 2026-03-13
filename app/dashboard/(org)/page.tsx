@@ -346,7 +346,7 @@ export default function DatabasesPage() {
         databases={databases}
         users={users}
         initialDatabase={connectionModalDb || undefined}
-        adminPassword={config?.password}
+        adminUsername={config?.username}
         knownPasswords={knownPasswords}
         onUsersRefresh={refreshUsers}
         onPasswordReset={(username, password) =>

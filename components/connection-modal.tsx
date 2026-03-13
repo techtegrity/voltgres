@@ -40,6 +40,9 @@ interface ConnectionModalProps {
   users: PgUserRow[]
   initialDatabase?: string
   initialUser?: string
+  /** Username of the admin PG connection (password fetched on demand) */
+  adminUsername?: string
+  /** @deprecated Use adminUsername instead. Masked values like "••••••••" are ignored. */
   adminPassword?: string
   /** Map of username → password for recently created users */
   knownPasswords?: Record<string, string>
@@ -89,6 +92,7 @@ export function ConnectionModal({
   users,
   initialDatabase,
   initialUser,
+  adminUsername,
   adminPassword,
   knownPasswords,
   onUsersRefresh,
@@ -106,6 +110,11 @@ export function ConnectionModal({
   const [tempPassword, setTempPassword] = useState<string | null>(null)
   const [isResetting, setIsResetting] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
+  // Lazily-fetched admin PG password (fetched once per modal open)
+  const [revealedAdminPassword, setRevealedAdminPassword] = useState<string | null>(null)
+
+  // The effective admin username (from prop or default "postgres")
+  const effectiveAdminUsername = adminUsername || "postgres"
 
   // Fetch public connection info on open
   useEffect(() => {
@@ -119,6 +128,17 @@ export function ConnectionModal({
       .catch(() => {
         setPublicHost(window.location.hostname)
       })
+  }, [open])
+
+  // Fetch the real admin password when the modal opens
+  useEffect(() => {
+    if (!open) return
+    setRevealedAdminPassword(null)
+    api.config.revealConnectionPassword()
+      .then(({ password }) => {
+        if (password) setRevealedAdminPassword(password)
+      })
+      .catch(() => {})
   }, [open])
 
   // Sync initial values when modal opens
@@ -181,10 +201,13 @@ export function ConnectionModal({
   // Determine the password to display
   const currentPassword = useMemo(() => {
     if (tempPassword) return tempPassword
-    if (selectedUser === "postgres" && adminPassword) return adminPassword
+    // Use the lazily-fetched admin password for the admin user
+    if (selectedUser === effectiveAdminUsername && revealedAdminPassword) {
+      return revealedAdminPassword
+    }
     if (knownPasswords?.[selectedUser]) return knownPasswords[selectedUser]
     return null
-  }, [tempPassword, selectedUser, adminPassword, knownPasswords])
+  }, [tempPassword, selectedUser, effectiveAdminUsername, revealedAdminPassword, knownPasswords])
 
   const displayPassword = currentPassword
     ? showPassword
@@ -425,7 +448,7 @@ export function ConnectionModal({
           </Button>
         </div>
 
-        {!hasPassword && selectedUser && selectedUser !== "postgres" && (
+        {!hasPassword && selectedUser && (
           <p className="text-xs text-muted-foreground text-center -mt-1">
             Password unknown — use <strong>Reset password</strong> above to generate a new one
           </p>
