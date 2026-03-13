@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { execSync } from "node:child_process"
+import { execFileSync, execSync } from "node:child_process"
+import { existsSync } from "node:fs"
 
 export const dynamic = "force-dynamic"
 
@@ -23,23 +24,51 @@ export interface DockerUsageData {
  * Gracefully returns { available: false } if Docker socket is not accessible.
  */
 export async function GET() {
+  // Step 1: Check if docker socket exists
+  if (!existsSync("/var/run/docker.sock")) {
+    console.log("[docker-usage] Socket /var/run/docker.sock does not exist")
+    return NextResponse.json({ available: false })
+  }
+
+  // Step 2: Find docker binary
+  let dockerBin = ""
+  for (const p of ["/usr/bin/docker", "/usr/local/bin/docker"]) {
+    if (existsSync(p)) {
+      dockerBin = p
+      break
+    }
+  }
+  if (!dockerBin) {
+    console.log("[docker-usage] docker binary not found")
+    return NextResponse.json({ available: false })
+  }
+
+  // Step 3: Check docker connectivity (use execFileSync to bypass shell)
   try {
-    // Check if docker is accessible
-    execSync("docker info", {
+    execFileSync(dockerBin, ["info"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     })
   } catch (err) {
-    console.log("[docker-usage] Docker not accessible:", (err as Error).message?.split("\n")[0])
+    const msg = (err as Error).message?.split("\n")[0] || "unknown"
+    console.log("[docker-usage] docker info failed:", msg)
     return NextResponse.json({ available: false })
   }
 
+  // Step 4: Get disk usage via `docker system df`
   try {
-    const output = execSync("docker system df --format '{{json .}}'", {
-      encoding: "utf-8",
-      timeout: 10000,
-    })
+    // Use execFileSync with args array to avoid shell quoting issues
+    const output = execFileSync(
+      dockerBin,
+      ["system", "df", "--format", "{{json .}}"],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      }
+    )
+
+    console.log("[docker-usage] raw output:", output.trim().substring(0, 200))
 
     const result: DockerUsageData = {
       available: true,
@@ -51,26 +80,33 @@ export async function GET() {
 
     for (const line of output.trim().split("\n")) {
       if (!line) continue
-      const row = JSON.parse(line)
-      const type = (row.Type as string).toLowerCase().replace(/\s+/g, "")
+      try {
+        const row = JSON.parse(line)
+        const type = (row.Type as string).toLowerCase().replace(/\s+/g, "")
 
-      const entry: DockerTypeUsage = {
-        total: parseInt(row.TotalCount, 10) || 0,
-        active: parseInt(row.Active, 10) || 0,
-        size: parseDockerSize(row.Size),
-        reclaimable: parseDockerSize(row.Reclaimable),
+        const entry: DockerTypeUsage = {
+          total: parseInt(row.TotalCount, 10) || 0,
+          active: parseInt(row.Active, 10) || 0,
+          size: parseDockerSize(row.Size),
+          reclaimable: parseDockerSize(row.Reclaimable),
+        }
+
+        if (type === "buildcache") result.buildCache = entry
+        else if (type === "images") result.images = entry
+        else if (type === "containers") result.containers = entry
+        else if (type === "localvolumes") result.volumes = entry
+      } catch (parseErr) {
+        console.log("[docker-usage] Failed to parse line:", line)
       }
-
-      if (type === "buildcache") result.buildCache = entry
-      else if (type === "images") result.images = entry
-      else if (type === "containers") result.containers = entry
-      else if (type === "localvolumes") result.volumes = entry
     }
 
+    console.log("[docker-usage] Returning:", JSON.stringify(result).substring(0, 200))
     return NextResponse.json(result)
   } catch (err) {
+    const msg = (err as Error).message || "unknown"
+    console.log("[docker-usage] docker system df failed:", msg)
     return NextResponse.json(
-      { error: (err as Error).message },
+      { error: msg },
       { status: 500 }
     )
   }
@@ -85,8 +121,11 @@ function parseDockerSize(sizeStr: string): number {
   // Strip parenthesized percentage like "24.52GB (100%)"
   const cleaned = sizeStr.replace(/\s*\(.*?\)/, "").trim()
 
-  const match = cleaned.match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i)
-  if (!match) return 0
+  const match = cleaned.match(/^([\d.]+)\s*(B|KB|kB|MB|GB|TB)$/i)
+  if (!match) {
+    console.log("[docker-usage] Failed to parse size:", sizeStr)
+    return 0
+  }
 
   const value = parseFloat(match[1])
   const unit = match[2].toUpperCase()

@@ -1,23 +1,31 @@
 import { NextResponse } from "next/server"
-import { execSync } from "node:child_process"
+import { execFileSync } from "node:child_process"
+import { existsSync } from "node:fs"
 
 export const dynamic = "force-dynamic"
 
 type PruneTarget = "build-cache" | "images" | "all"
 
-const COMMANDS: Record<PruneTarget, { cmd: string; label: string }> = {
+const COMMANDS: Record<PruneTarget, { args: string[]; label: string }> = {
   "build-cache": {
-    cmd: "docker builder prune -a -f",
+    args: ["builder", "prune", "-a", "-f"],
     label: "build cache",
   },
   images: {
-    cmd: "docker image prune -a -f",
+    args: ["image", "prune", "-a", "-f"],
     label: "unused images",
   },
   all: {
-    cmd: "docker system prune -a -f",
+    args: ["system", "prune", "-a", "-f"],
     label: "all unused Docker data",
   },
+}
+
+function findDocker(): string | null {
+  for (const p of ["/usr/bin/docker", "/usr/local/bin/docker"]) {
+    if (existsSync(p)) return p
+  }
+  return null
 }
 
 /**
@@ -40,9 +48,14 @@ export async function POST(request: Request) {
     )
   }
 
+  const dockerBin = findDocker()
+  if (!dockerBin) {
+    return NextResponse.json({ error: "Docker binary not found" }, { status: 503 })
+  }
+
   // Check if docker is accessible
   try {
-    execSync("docker info", {
+    execFileSync(dockerBin, ["info"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -55,8 +68,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { cmd, label } = COMMANDS[target]
-    const output = execSync(cmd, {
+    const { args, label } = COMMANDS[target]
+    const output = execFileSync(dockerBin, args, {
       encoding: "utf-8",
       timeout: 120000, // 2 min timeout for large prunes
     })

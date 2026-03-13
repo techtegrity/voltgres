@@ -71,10 +71,14 @@ export function DiskUsageDialog({
     setError(null)
     Promise.all([
       api.system.diskUsage(),
-      api.system.dockerUsage().catch(() => null),
+      api.system.dockerUsage().catch((err) => {
+        console.warn("[disk-usage] Docker usage fetch failed:", err)
+        return null
+      }),
     ])
       .then(([diskData, docker]) => {
         setData(diskData)
+        if (docker) console.log("[disk-usage] Docker data:", docker)
         setDockerData(docker)
       })
       .catch((err) => setError((err as Error).message))
