@@ -204,6 +204,37 @@ export interface SystemMetrics {
   timestamp: number
 }
 
+export interface ProcessEntry {
+  pid: number
+  user: string
+  cpuPercent: number
+  memPercent: number
+  rssBytes: number
+  vsz: number
+  command: string
+}
+
+export interface ProcessesData {
+  topByCpu: ProcessEntry[]
+  topByMemory: ProcessEntry[]
+  cpuInfo: {
+    cores: number
+    model: string
+    loadAvg: number[]
+  }
+  memoryBreakdown: {
+    total: number
+    free: number
+    available: number
+    buffers: number
+    cached: number
+    swapTotal: number
+    swapFree: number
+    shmem: number
+    sreclaimable: number
+  }
+}
+
 export interface DiskUsageEntry {
   path: string
   label: string
@@ -437,6 +468,7 @@ export const api = {
   system: {
     metrics: () => apiFetch<SystemMetrics>("/api/system/metrics"),
     diskUsage: () => apiFetch<DiskUsageData>("/api/system/disk-usage"),
+    processes: () => apiFetch<ProcessesData>("/api/system/processes"),
   },
 
   storage: {

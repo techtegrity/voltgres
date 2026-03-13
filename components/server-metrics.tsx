@@ -18,6 +18,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { DiskUsageDialog } from "@/components/disk-usage-dialog"
+import { CpuUsageDialog } from "@/components/cpu-usage-dialog"
+import { MemoryUsageDialog } from "@/components/memory-usage-dialog"
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B"
@@ -108,6 +110,8 @@ const chartConfig = {
 export function ServerMetrics() {
   const { metrics, history, loading } = useSystemMetrics(5000)
   const [diskDialogOpen, setDiskDialogOpen] = useState(false)
+  const [cpuDialogOpen, setCpuDialogOpen] = useState(false)
+  const [memDialogOpen, setMemDialogOpen] = useState(false)
 
   if (loading || !metrics) {
     return (
@@ -145,18 +149,34 @@ export function ServerMetrics() {
           <div className="flex items-stretch gap-4">
             {/* Gauges column — compact row */}
             <div className="flex items-center gap-4 shrink-0">
-              <GaugeItem
-                icon={<Cpu className="w-3 h-3" />}
-                label="CPU"
-                percent={metrics.cpu.usagePercent}
-                detail={`${metrics.cpu.cores} cores`}
-              />
-              <GaugeItem
-                icon={<MemoryStick className="w-3 h-3" />}
-                label="Mem"
-                percent={metrics.memory.usagePercent}
-                detail={`${formatBytes(metrics.memory.usedBytes)} / ${formatBytes(metrics.memory.totalBytes)}`}
-              />
+              <button
+                type="button"
+                onClick={() => setCpuDialogOpen(true)}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md transition-colors hover:bg-muted/50 -m-1.5 p-1.5 cursor-pointer"
+                title="Click to view CPU processes"
+              >
+                <GaugeItem
+                  icon={<Cpu className="w-3 h-3" />}
+                  label="CPU"
+                  percent={metrics.cpu.usagePercent}
+                  detail={`${metrics.cpu.cores} cores`}
+                  clickable
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMemDialogOpen(true)}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md transition-colors hover:bg-muted/50 -m-1.5 p-1.5 cursor-pointer"
+                title="Click to view memory breakdown"
+              >
+                <GaugeItem
+                  icon={<MemoryStick className="w-3 h-3" />}
+                  label="Mem"
+                  percent={metrics.memory.usagePercent}
+                  detail={`${formatBytes(metrics.memory.usedBytes)} / ${formatBytes(metrics.memory.totalBytes)}`}
+                  clickable
+                />
+              </button>
               <button
                 type="button"
                 onClick={() => setDiskDialogOpen(true)}
@@ -232,6 +252,8 @@ export function ServerMetrics() {
         </CardContent>
       </Card>
 
+      <CpuUsageDialog open={cpuDialogOpen} onOpenChange={setCpuDialogOpen} />
+      <MemoryUsageDialog open={memDialogOpen} onOpenChange={setMemDialogOpen} />
       <DiskUsageDialog open={diskDialogOpen} onOpenChange={setDiskDialogOpen} />
     </>
   )
