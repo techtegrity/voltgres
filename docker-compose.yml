@@ -40,7 +40,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
       - DOMAIN=${DOMAIN:-}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - postgres-ssl:/var/lib/postgresql/ssl
