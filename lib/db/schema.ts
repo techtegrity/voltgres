@@ -132,6 +132,32 @@ export const pgUserPassword = sqliteTable("pg_user_password", {
     .references(() => user.id),
 })
 
+export const queryLog = sqliteTable("query_log", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+  database: text("database").notNull(),
+  query: text("query").notNull(),
+  command: text("command").notNull(), // SELECT, INSERT, UPDATE, DELETE, etc.
+  rowCount: integer("row_count"),
+  executionTime: integer("execution_time"), // ms
+  columns: text("columns"), // JSON array of column names
+  resultPreview: text("result_preview"), // JSON - first 20 rows
+  error: text("error"),
+  source: text("source").notNull(), // sql-editor, table-insert, table-update, table-delete
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+})
+
+export const queryLogConfig = sqliteTable("query_log_config", {
+  id: text("id").primaryKey(),
+  database: text("database").notNull().unique(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  retentionDays: integer("retention_days").notNull().default(7), // 1, 7, or 30
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+})
+
 export const snapshot = sqliteTable("snapshot", {
   id: text("id").primaryKey(),
   database: text("database").notNull(),

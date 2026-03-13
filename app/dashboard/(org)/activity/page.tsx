@@ -1,0 +1,384 @@
+"use client"
+
+import { useState } from "react"
+import { useQueryLog, useQueryLogDetail, useQueryLogStats } from "@/hooks/use-query-log"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Database,
+  Loader2,
+  Activity,
+  RefreshCw,
+} from "lucide-react"
+
+const SIZE_WARNING_BYTES = 50 * 1024 * 1024 // 50 MB
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function truncateQuery(query: string, maxLen = 80) {
+  if (query.length <= maxLen) return query
+  return query.slice(0, maxLen) + "..."
+}
+
+function commandBadgeVariant(command: string) {
+  switch (command.toUpperCase()) {
+    case "SELECT":
+      return "secondary" as const
+    case "INSERT":
+      return "default" as const
+    case "UPDATE":
+      return "outline" as const
+    case "DELETE":
+      return "destructive" as const
+    case "ERROR":
+      return "destructive" as const
+    default:
+      return "secondary" as const
+  }
+}
+
+export default function ActivityPage() {
+  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [page, setPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const pageSize = 30
+
+  const { entries, totalCount, loading, refresh } = useQueryLog({
+    search,
+    page,
+    pageSize,
+    autoRefresh: true,
+  })
+  const { entry: detail, loading: detailLoading } = useQueryLogDetail(expandedId)
+  const { stats } = useQueryLogStats()
+
+  const totalPages = Math.ceil(totalCount / pageSize)
+  const warningDbs = stats.filter((s) => s.estimatedSizeBytes > SIZE_WARNING_BYTES)
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSearch(searchInput)
+    setPage(1)
+  }
+
+  return (
+    <div className="p-6 lg:p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Activity className="w-6 h-6" />
+            Activity
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Query log across all databases
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Disk usage warnings */}
+      {warningDbs.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {warningDbs.map((s) => (
+            <div
+              key={s.database}
+              className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm"
+            >
+              <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+              <span>
+                <strong>{s.database}</strong> query log is using{" "}
+                <strong>{formatBytes(s.estimatedSizeBytes)}</strong> ({s.entryCount.toLocaleString()}{" "}
+                entries). Consider reducing retention or disabling logging.
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search queries..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button type="submit" variant="secondary" size="sm">
+          Search
+        </Button>
+        {search && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch("")
+              setSearchInput("")
+              setPage(1)
+            }}
+          >
+            Clear
+          </Button>
+        )}
+      </form>
+
+      {/* Table */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">
+              {totalCount.toLocaleString()} {totalCount === 1 ? "query" : "queries"}
+            </CardTitle>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span>
+                  {page} / {totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No query activity recorded yet</p>
+              <p className="text-xs mt-1">
+                Queries executed via the SQL Editor or table operations will appear here
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border bg-muted/50">
+                    <TableHead className="w-[140px]">Time</TableHead>
+                    <TableHead className="w-[120px]">Database</TableHead>
+                    <TableHead>Query</TableHead>
+                    <TableHead className="w-[80px]">Type</TableHead>
+                    <TableHead className="w-[60px] text-right">Rows</TableHead>
+                    <TableHead className="w-[80px] text-right">Duration</TableHead>
+                    <TableHead className="w-[70px]">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <QueryRow
+                      key={entry.id}
+                      entry={entry}
+                      isExpanded={expandedId === entry.id}
+                      detail={expandedId === entry.id ? detail : null}
+                      detailLoading={expandedId === entry.id && detailLoading}
+                      onToggle={() =>
+                        setExpandedId((prev) => (prev === entry.id ? null : entry.id))
+                      }
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function QueryRow({
+  entry,
+  isExpanded,
+  detail,
+  detailLoading,
+  onToggle,
+}: {
+  entry: { id: string; database: string; query: string; command: string; rowCount: number | null; executionTime: number | null; error: string | null; source: string; createdAt: string }
+  isExpanded: boolean
+  detail: { columns: string[] | null; resultPreview: Record<string, unknown>[] | null; query: string } | null
+  detailLoading: boolean
+  onToggle: () => void
+}) {
+  return (
+    <>
+      <TableRow
+        className="border-border cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={onToggle}
+      >
+        <TableCell className="text-xs text-muted-foreground">
+          {formatDate(entry.createdAt)}
+        </TableCell>
+        <TableCell>
+          <span className="inline-flex items-center gap-1 text-xs font-mono">
+            <Database className="w-3 h-3 text-muted-foreground" />
+            {entry.database}
+          </span>
+        </TableCell>
+        <TableCell className="font-mono text-xs max-w-[400px]">
+          <span className="break-all">{truncateQuery(entry.query)}</span>
+        </TableCell>
+        <TableCell>
+          <Badge variant={commandBadgeVariant(entry.command)} className="text-xs">
+            {entry.command}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums">
+          {entry.rowCount ?? "-"}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+          {entry.executionTime != null ? (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {entry.executionTime}ms
+            </span>
+          ) : (
+            "-"
+          )}
+        </TableCell>
+        <TableCell>
+          {entry.error ? (
+            <XCircle className="w-4 h-4 text-destructive" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-primary" />
+          )}
+        </TableCell>
+      </TableRow>
+
+      {/* Expanded detail row */}
+      {isExpanded && (
+        <TableRow className="border-border bg-muted/30">
+          <TableCell colSpan={7} className="p-4">
+            {detailLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading details...
+              </div>
+            ) : detail ? (
+              <div className="space-y-3">
+                {/* Full query */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Full Query</p>
+                  <pre className="p-3 rounded-lg bg-background border border-border text-xs font-mono whitespace-pre-wrap max-h-40 overflow-auto">
+                    {detail.query}
+                  </pre>
+                </div>
+
+                {/* Error if any */}
+                {entry.error && (
+                  <div>
+                    <p className="text-xs font-medium text-destructive mb-1">Error</p>
+                    <pre className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-mono whitespace-pre-wrap">
+                      {entry.error}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Source info */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span>
+                    Source: <Badge variant="outline" className="text-xs ml-1">{entry.source}</Badge>
+                  </span>
+                </div>
+
+                {/* Result preview table */}
+                {detail.resultPreview && detail.resultPreview.length > 0 && detail.columns && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      Result Preview ({detail.resultPreview.length} of {entry.rowCount} rows)
+                    </p>
+                    <div className="overflow-x-auto rounded-lg border border-border max-h-64 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border bg-muted/50">
+                            {detail.columns.map((col) => (
+                              <TableHead
+                                key={col}
+                                className="text-muted-foreground font-mono text-xs"
+                              >
+                                {col}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {detail.resultPreview.map((row, idx) => (
+                            <TableRow key={idx} className="border-border">
+                              {detail.columns!.map((col) => (
+                                <TableCell key={col} className="font-mono text-xs py-1.5">
+                                  {String(row[col] ?? "NULL")}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  )
+}

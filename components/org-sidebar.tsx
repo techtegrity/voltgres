@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import {
   Database,
   Users,
+  Activity,
   Settings,
   LogOut,
   ChevronDown,
@@ -17,6 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 const navigation = [
   { name: "Databases", href: "/dashboard", icon: Database },
   { name: "Users", href: "/dashboard/users", icon: Users },
+  { name: "Activity", href: "/dashboard/activity", icon: Activity },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 

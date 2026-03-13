@@ -270,6 +270,47 @@ export interface DockerPruneResult {
   message: string
 }
 
+export interface QueryLogEntry {
+  id: string
+  userId: string
+  database: string
+  query: string
+  command: string
+  rowCount: number | null
+  executionTime: number | null
+  columns: string[] | null
+  error: string | null
+  source: string
+  createdAt: string
+}
+
+export interface QueryLogDetail extends QueryLogEntry {
+  resultPreview: Record<string, unknown>[] | null
+}
+
+export interface QueryLogListResult {
+  entries: QueryLogEntry[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export interface QueryLogStatsEntry {
+  database: string
+  entryCount: number
+  estimatedSizeBytes: number
+  oldestEntry: string | null
+  newestEntry: string | null
+  retentionDays: number
+  enabled: boolean
+}
+
+export interface QueryLogConfigData {
+  database: string
+  enabled: boolean
+  retentionDays: number
+}
+
 export const api = {
   databases: {
     list: () => apiFetch<DatabaseRow[]>("/api/pg/databases"),
@@ -560,6 +601,27 @@ export const api = {
         { schema: string; name: string; rowCount: number; sizeBytes: number }[]
       >("/api/pg/import/tables", {
         method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  queryLog: {
+    list: (opts?: { db?: string; search?: string; page?: number; pageSize?: number }) => {
+      const params = new URLSearchParams()
+      if (opts?.db) params.set("db", opts.db)
+      if (opts?.search) params.set("search", opts.search)
+      if (opts?.page) params.set("page", String(opts.page))
+      if (opts?.pageSize) params.set("pageSize", String(opts.pageSize))
+      const qs = params.toString()
+      return apiFetch<QueryLogListResult>(`/api/pg/query-log${qs ? `?${qs}` : ""}`)
+    },
+    get: (id: string) => apiFetch<QueryLogDetail>(`/api/pg/query-log/${id}`),
+    stats: () => apiFetch<QueryLogStatsEntry[]>("/api/pg/query-log/stats"),
+    getConfig: (db: string) =>
+      apiFetch<QueryLogConfigData>(`/api/pg/query-log/config?db=${encodeURIComponent(db)}`),
+    updateConfig: (data: { database: string; enabled?: boolean; retentionDays?: number }) =>
+      apiFetch<QueryLogConfigData>("/api/pg/query-log/config", {
+        method: "PUT",
         body: JSON.stringify(data),
       }),
   },

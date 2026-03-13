@@ -15,6 +15,13 @@
       "when": 1773365356761,
       "tag": "0001_outgoing_the_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773414458450,
+      "tag": "0002_tired_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }

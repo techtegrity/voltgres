@@ -10,6 +10,7 @@ import {
   getTableColumns,
   type TableFilter,
 } from "@/lib/pg/queries"
+import { logQuery } from "@/lib/db/query-log"
 
 function authAndPool() {
   return async (dbName: string) => {
@@ -93,6 +94,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No connection configured" }, { status: 400 })
 
     const row = await insertTableRow(pool, schema, table, data)
+
+    logQuery({
+      userId: session.user.id,
+      database: db,
+      query: `INSERT INTO "${schema}"."${table}" (${Object.keys(data).join(", ")})`,
+      command: "INSERT",
+      rowCount: 1,
+      columns: row ? Object.keys(row) : undefined,
+      resultRows: row ? [row] : undefined,
+      source: "table-insert",
+    }).catch(() => {})
+
     return NextResponse.json(row)
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
@@ -128,6 +141,17 @@ export async function PATCH(request: NextRequest) {
     if (!row)
       return NextResponse.json({ error: "Row not found" }, { status: 404 })
 
+    logQuery({
+      userId: session.user.id,
+      database: db,
+      query: `UPDATE "${schema}"."${table}" SET ${Object.keys(data).join(", ")} WHERE ${Object.entries(pkValues).map(([k, v]) => `${k} = ${v}`).join(" AND ")}`,
+      command: "UPDATE",
+      rowCount: 1,
+      columns: row ? Object.keys(row) : undefined,
+      resultRows: row ? [row] : undefined,
+      source: "table-update",
+    }).catch(() => {})
+
     return NextResponse.json(row)
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
@@ -160,6 +184,16 @@ export async function DELETE(request: NextRequest) {
       )
 
     const result = await deleteTableRows(pool, schema, table, pkValueSets)
+
+    logQuery({
+      userId: session.user.id,
+      database: db,
+      query: `DELETE FROM "${schema}"."${table}" (${pkValueSets.length} row(s))`,
+      command: "DELETE",
+      rowCount: result.deletedCount,
+      source: "table-delete",
+    }).catch(() => {})
+
     return NextResponse.json(result)
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
