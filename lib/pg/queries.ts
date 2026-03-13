@@ -1011,6 +1011,103 @@ export async function resetPgStatStatements(pool: Pool): Promise<void> {
   await pool.query(`SELECT pg_stat_statements_reset()`)
 }
 
+// ── Table-level privilege introspection & management ──────────────────
+
+export interface TablePrivilegeRow {
+  schema: string
+  table_name: string
+  table_owner: string
+  username: string
+  superuser: boolean
+  is_table_owner: boolean
+  select: boolean
+  insert: boolean
+  update: boolean
+  delete: boolean
+  truncate: boolean
+  references: boolean
+  trigger: boolean
+}
+
+/**
+ * Get per-user privilege breakdown for all tables in the current database.
+ * Must be called on a pool connected to the target database (not postgres).
+ */
+export async function getTablePrivileges(pool: Pool): Promise<TablePrivilegeRow[]> {
+  const result = await pool.query(`
+    SELECT
+      t.schemaname AS schema,
+      t.tablename AS table_name,
+      t.tableowner AS table_owner,
+      r.rolname AS username,
+      r.rolsuper AS superuser,
+      (t.tableowner = r.rolname) AS is_table_owner,
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'SELECT') AS "select",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'INSERT') AS "insert",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'UPDATE') AS "update",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'DELETE') AS "delete",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'TRUNCATE') AS "truncate",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'REFERENCES') AS "references",
+      has_table_privilege(r.oid, (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass, 'TRIGGER') AS "trigger"
+    FROM pg_tables t
+    CROSS JOIN pg_roles r
+    WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema')
+      AND r.rolname NOT LIKE 'pg_%'
+      AND r.rolcanlogin = true
+    ORDER BY t.schemaname, t.tablename, r.rolname
+  `)
+  return result.rows
+}
+
+const VALID_TABLE_PRIVILEGES = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] as const
+type TablePrivilege = (typeof VALID_TABLE_PRIVILEGES)[number]
+
+export async function grantTablePrivilege(
+  pool: Pool,
+  username: string,
+  schema: string,
+  table: string,
+  privilege: string
+) {
+  const priv = privilege.toUpperCase() as TablePrivilege
+  if (!VALID_TABLE_PRIVILEGES.includes(priv)) {
+    throw new Error(`Invalid table privilege: ${privilege}`)
+  }
+  const safeUser = username.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeSchema = schema.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeTable = table.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`GRANT ${priv} ON TABLE "${safeSchema}"."${safeTable}" TO "${safeUser}"`)
+}
+
+export async function revokeTablePrivilege(
+  pool: Pool,
+  username: string,
+  schema: string,
+  table: string,
+  privilege: string
+) {
+  const priv = privilege.toUpperCase() as TablePrivilege
+  if (!VALID_TABLE_PRIVILEGES.includes(priv)) {
+    throw new Error(`Invalid table privilege: ${privilege}`)
+  }
+  const safeUser = username.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeSchema = schema.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeTable = table.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`REVOKE ${priv} ON TABLE "${safeSchema}"."${safeTable}" FROM "${safeUser}"`)
+}
+
+export async function transferTableOwnership(
+  pool: Pool,
+  schema: string,
+  table: string,
+  newOwner: string
+) {
+  const safeSchema = schema.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeTable = table.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeOwner = newOwner.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`ALTER TABLE "${safeSchema}"."${safeTable}" OWNER TO "${safeOwner}"`)
+}
+
 export async function getServerInfo(pool: Pool) {
   const versionResult = await pool.query("SELECT version()")
   const uptimeResult = await pool.query(

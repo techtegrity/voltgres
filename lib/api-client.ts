@@ -271,6 +271,22 @@ export interface DockerPruneResult {
   message: string
 }
 
+export interface TablePrivilegeRow {
+  schema: string
+  table_name: string
+  table_owner: string
+  username: string
+  superuser: boolean
+  is_table_owner: boolean
+  select: boolean
+  insert: boolean
+  update: boolean
+  delete: boolean
+  truncate: boolean
+  references: boolean
+  trigger: boolean
+}
+
 export interface PgStatStatementEntry {
   queryid: string
   query: string
@@ -369,6 +385,24 @@ export const api = {
       }
     ) =>
       apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/privileges`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    tablePrivileges: (name: string) =>
+      apiFetch<TablePrivilegeRow[]>(
+        `/api/pg/databases/${encodeURIComponent(name)}/table-privileges`
+      ),
+    updateTablePrivilege: (
+      name: string,
+      data: {
+        username: string
+        schema: string
+        table: string
+        privilege?: string
+        action: "grant" | "revoke" | "transfer_ownership"
+      }
+    ) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/table-privileges`, {
         method: "PATCH",
         body: JSON.stringify(data),
       }),

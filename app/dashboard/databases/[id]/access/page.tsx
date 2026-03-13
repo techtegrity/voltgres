@@ -30,6 +30,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Field, FieldLabel } from "@/components/ui/field"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { TablePrivilegesGrid } from "@/components/table-privileges-grid"
 import {
   Shield,
   Plus,
@@ -41,6 +43,8 @@ import {
   Blocks,
   Clock,
   Info,
+  Table2,
+  Database,
 } from "lucide-react"
 
 const PRIVILEGES = [
@@ -176,7 +180,7 @@ export default function DatabaseAccessControlPage({
   const regularUsers = privileges.filter((p) => !p.is_owner && !p.superuser)
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl">
+    <div className="p-6 lg:p-8 max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -185,274 +189,300 @@ export default function DatabaseAccessControlPage({
             Manage who can access <span className="font-mono">{dbName}</span> and what they can do
           </p>
         </div>
-        <Dialog open={isGrantOpen} onOpenChange={setIsGrantOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" disabled={availableUsers.length === 0}>
-              <Plus className="w-4 h-4" />
-              Grant Access
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border max-w-md">
-            <DialogHeader>
-              <DialogTitle>Grant Database Access</DialogTitle>
-              <DialogDescription>
-                Select a user to grant full access to {dbName}. You can adjust
-                individual privileges after granting.
-              </DialogDescription>
-            </DialogHeader>
-            <Field>
-              <FieldLabel>User</FieldLabel>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger className="bg-input border-border">
-                  <SelectValue placeholder="Select user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableUsers.map((user) => (
-                    <SelectItem key={user.username} value={user.username}>
-                      {user.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button onClick={handleGrantAccess} disabled={!selectedUser}>
-                Grant Access
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* Privilege Legend */}
-      <div className="flex flex-wrap gap-4 mb-6 text-xs text-muted-foreground">
-        {PRIVILEGES.map((p) => (
-          <div key={p.key} className="flex items-center gap-1.5">
-            <p.icon className="w-3.5 h-3.5" />
-            <span className="font-medium">{p.label}</span>
-            <span>— {p.description}</span>
-          </div>
-        ))}
-      </div>
+      <Tabs defaultValue="database">
+        <TabsList>
+          <TabsTrigger value="database" className="gap-1.5">
+            <Database className="w-3.5 h-3.5" />
+            Database
+          </TabsTrigger>
+          <TabsTrigger value="tables" className="gap-1.5">
+            <Table2 className="w-3.5 h-3.5" />
+            Tables
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Owner */}
-      {owner && (
-        <Card className="bg-card border-border mb-4">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-amber-500" />
-              <CardTitle className="text-sm">Database Owner</CardTitle>
-            </div>
-            <CardDescription className="text-xs">
-              The owner has full unrestricted access. Change ownership in database settings.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20">
-                  <span className="text-sm font-medium text-amber-600">
-                    {owner.username.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground font-mono text-sm">{owner.username}</p>
-                  <p className="text-xs text-muted-foreground">Full privileges (owner)</p>
-                </div>
-              </div>
-              <div className="flex gap-1.5">
+        <TabsContent value="database">
+          <div className="space-y-4 mt-2">
+            {/* Grant Access button */}
+            <div className="flex justify-between items-center">
+              {/* Privilege Legend */}
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 {PRIVILEGES.map((p) => (
-                  <Badge key={p.key} variant="secondary" className="text-xs gap-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
-                    <p.icon className="w-3 h-3" />
-                    {p.label}
-                  </Badge>
+                  <div key={p.key} className="flex items-center gap-1.5">
+                    <p.icon className="w-3.5 h-3.5" />
+                    <span className="font-medium">{p.label}</span>
+                    <span>— {p.description}</span>
+                  </div>
                 ))}
               </div>
+              <Dialog open={isGrantOpen} onOpenChange={setIsGrantOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 shrink-0 ml-4" size="sm" disabled={availableUsers.length === 0}>
+                    <Plus className="w-4 h-4" />
+                    Grant Access
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Grant Database Access</DialogTitle>
+                    <DialogDescription>
+                      Select a user to grant full access to {dbName}. You can adjust
+                      individual privileges after granting.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Field>
+                    <FieldLabel>User</FieldLabel>
+                    <Select value={selectedUser} onValueChange={setSelectedUser}>
+                      <SelectTrigger className="bg-input border-border">
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableUsers.map((user) => (
+                          <SelectItem key={user.username} value={user.username}>
+                            {user.username}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleGrantAccess} disabled={!selectedUser}>
+                      Grant Access
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Superusers */}
-      {superusers.length > 0 && (
-        <Card className="bg-card border-border mb-4">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm">Superusers</CardTitle>
-            </div>
-            <CardDescription className="text-xs">
-              Superusers bypass all privilege checks and always have full access.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {superusers.map((user) => (
-                <div
-                  key={user.username}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-sm font-medium text-primary">
-                        {user.username.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground font-mono text-sm">{user.username}</p>
-                      <p className="text-xs text-muted-foreground">All privileges (superuser)</p>
-                    </div>
+            {/* Owner */}
+            {owner && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-amber-500" />
+                    <CardTitle className="text-sm">Database Owner</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    Superuser
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Regular Users */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-sm">User Privileges</CardTitle>
-          </div>
-          <CardDescription className="text-xs">
-            {regularUsers.length} user{regularUsers.length !== 1 ? "s" : ""} with
-            explicit access. Toggle individual privileges per user.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {regularUsers.length > 0 ? (
-            <TooltipProvider>
-              <div className="space-y-2">
-                {regularUsers.map((user) => (
-                  <div
-                    key={user.username}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border"
-                  >
+                  <CardDescription className="text-xs">
+                    The owner has full unrestricted access. Change ownership in database settings.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border">
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-border">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          {user.username.charAt(0).toUpperCase()}
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20">
+                        <span className="text-sm font-medium text-amber-600">
+                          {owner.username.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground font-mono text-sm">
-                            {user.username}
-                          </p>
-                          {!user.can_login && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                              No login
-                            </Badge>
-                          )}
-                        </div>
-                        {user.connection_limit >= 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            Connection limit: {user.connection_limit}
-                          </p>
-                        )}
+                        <p className="font-medium text-foreground font-mono text-sm">{owner.username}</p>
+                        <p className="text-xs text-muted-foreground">Full privileges (owner)</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {/* Privilege toggles */}
-                      {PRIVILEGES.map((priv) => {
-                        const isActive = user[priv.key]
-                        const isToggling = toggling === `${user.username}:${priv.key}`
-                        return (
-                          <Tooltip key={priv.key}>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant={isActive ? "default" : "outline"}
-                                size="sm"
-                                className={`gap-1 h-7 text-xs ${
-                                  isActive
-                                    ? "bg-primary/90 hover:bg-primary/70"
-                                    : "text-muted-foreground hover:text-foreground"
-                                }`}
-                                disabled={isToggling}
-                                onClick={() =>
-                                  handleTogglePrivilege(
-                                    user.username,
-                                    priv.key,
-                                    isActive
-                                  )
-                                }
-                              >
-                                {isToggling ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <priv.icon className="w-3 h-3" />
-                                )}
-                                {priv.label}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>
-                                {isActive ? "Revoke" : "Grant"} {priv.label}: {priv.description}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )
-                      })}
-
-                      {/* Revoke all */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-muted-foreground hover:text-destructive gap-1 text-xs ml-1"
-                            disabled={toggling === user.username}
-                            onClick={() => handleRevokeAll(user.username)}
-                          >
-                            {toggling === user.username ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <UserMinus className="w-3 h-3" />
-                            )}
-                            Revoke
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Revoke all access to this database</p>
-                        </TooltipContent>
-                      </Tooltip>
+                    <div className="flex gap-1.5">
+                      {PRIVILEGES.map((p) => (
+                        <Badge key={p.key} variant="secondary" className="text-xs gap-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
+                          <p.icon className="w-3 h-3" />
+                          {p.label}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </TooltipProvider>
-          ) : (
-            <div className="py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-              <Shield className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No users have been granted explicit access</p>
-              <p className="text-xs mt-1">
-                Use the &ldquo;Grant Access&rdquo; button to add users
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Superusers */}
+            {superusers.length > 0 && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-sm">Superusers</CardTitle>
+                  </div>
+                  <CardDescription className="text-xs">
+                    Superusers bypass all privilege checks and always have full access.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {superusers.map((user) => (
+                      <div
+                        key={user.username}
+                        className="flex items-center justify-between p-3 rounded-lg border border-border"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 border border-primary/20">
+                            <span className="text-sm font-medium text-primary">
+                              {user.username.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground font-mono text-sm">{user.username}</p>
+                            <p className="text-xs text-muted-foreground">All privileges (superuser)</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          Superuser
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Regular Users */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-muted-foreground" />
+                  <CardTitle className="text-sm">User Privileges</CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  {regularUsers.length} user{regularUsers.length !== 1 ? "s" : ""} with
+                  explicit access. Toggle individual privileges per user.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {regularUsers.length > 0 ? (
+                  <TooltipProvider>
+                    <div className="space-y-2">
+                      {regularUsers.map((user) => (
+                        <div
+                          key={user.username}
+                          className="flex items-center justify-between p-3 rounded-lg border border-border"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-border">
+                              <span className="text-sm font-medium text-muted-foreground">
+                                {user.username.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-foreground font-mono text-sm">
+                                  {user.username}
+                                </p>
+                                {!user.can_login && (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                    No login
+                                  </Badge>
+                                )}
+                              </div>
+                              {user.connection_limit >= 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  Connection limit: {user.connection_limit}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {/* Privilege toggles */}
+                            {PRIVILEGES.map((priv) => {
+                              const isActive = user[priv.key]
+                              const isToggling = toggling === `${user.username}:${priv.key}`
+                              return (
+                                <Tooltip key={priv.key}>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant={isActive ? "default" : "outline"}
+                                      size="sm"
+                                      className={`gap-1 h-7 text-xs ${
+                                        isActive
+                                          ? "bg-primary/90 hover:bg-primary/70"
+                                          : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                      disabled={isToggling}
+                                      onClick={() =>
+                                        handleTogglePrivilege(
+                                          user.username,
+                                          priv.key,
+                                          isActive
+                                        )
+                                      }
+                                    >
+                                      {isToggling ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <priv.icon className="w-3 h-3" />
+                                      )}
+                                      {priv.label}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>
+                                      {isActive ? "Revoke" : "Grant"} {priv.label}: {priv.description}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )
+                            })}
+
+                            {/* Revoke all */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-muted-foreground hover:text-destructive gap-1 text-xs ml-1"
+                                  disabled={toggling === user.username}
+                                  onClick={() => handleRevokeAll(user.username)}
+                                >
+                                  {toggling === user.username ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <UserMinus className="w-3 h-3" />
+                                  )}
+                                  Revoke
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Revoke all access to this database</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TooltipProvider>
+                ) : (
+                  <div className="py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+                    <Shield className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No users have been granted explicit access</p>
+                    <p className="text-xs mt-1">
+                      Use the &ldquo;Grant Access&rdquo; button to add users
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Info footer */}
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <p>
+                These are PostgreSQL database-level privileges. Superusers and the database
+                owner always have full access regardless of these settings. To manage which
+                users exist on this server, go to the global{" "}
+                <span className="font-medium text-foreground/70">Users</span> page.
               </p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </TabsContent>
 
-      {/* Info footer */}
-      <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
-        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        <p>
-          These are PostgreSQL database-level privileges. Superusers and the database
-          owner always have full access regardless of these settings. To manage which
-          users exist on this server, go to the global{" "}
-          <span className="font-medium text-foreground/70">Users</span> page.
-        </p>
-      </div>
+        <TabsContent value="tables">
+          <div className="mt-2">
+            <TablePrivilegesGrid dbName={dbName} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
