@@ -22,6 +22,7 @@ export function getPool(configId: string, config: PgConnectionConfig): Pool {
     user: config.user,
     password: config.password,
     database: config.database || "postgres",
+    application_name: "voltgres",
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
