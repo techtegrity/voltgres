@@ -35,8 +35,8 @@ export default function SignupPage() {
       return
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters")
+    if (password.length < 10) {
+      setError("Password must be at least 10 characters")
       return
     }
 
@@ -137,7 +137,7 @@ export default function SignupPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    At least 8 characters
+                    At least 10 characters
                   </p>
                 </Field>
 

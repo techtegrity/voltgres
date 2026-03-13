@@ -10,6 +10,7 @@ import { createReadStream } from "fs"
 import { stat } from "fs/promises"
 import { db } from "@/lib/db"
 import { storageConfig } from "@/lib/db/schema"
+import { decrypt } from "@/lib/crypto"
 
 export interface StorageClientResult {
   client: S3Client
@@ -32,7 +33,7 @@ export async function getStorageClient(): Promise<StorageClientResult> {
       endpoint: config.endpoint || undefined,
       credentials: {
         accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
+        secretAccessKey: decrypt(config.secretAccessKey),
       },
       forcePathStyle: !!config.endpoint,
     }),

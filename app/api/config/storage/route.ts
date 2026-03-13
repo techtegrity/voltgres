@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import { db } from "@/lib/db"
 import { storageConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { encrypt, decrypt } from "@/lib/crypto"
 
 export const dynamic = "force-dynamic"
 
@@ -20,11 +21,12 @@ export async function GET() {
     return NextResponse.json(null)
   }
 
-  // Mask the secret key
+  // Decrypt and mask the secret key
+  const rawSecret = config.secretAccessKey ? decrypt(config.secretAccessKey) : ""
   return NextResponse.json({
     ...config,
-    secretAccessKey: config.secretAccessKey
-      ? `****${config.secretAccessKey.slice(-4)}`
+    secretAccessKey: rawSecret
+      ? `****${rawSecret.slice(-4)}`
       : "",
   })
 }
@@ -51,7 +53,7 @@ export async function PUT(request: NextRequest) {
   if (existing.length > 0) {
     // Check if secretAccessKey is the masked value — if so, keep the old one
     const actualSecret =
-      secretAccessKey.startsWith("****") ? existing[0].secretAccessKey : secretAccessKey
+      secretAccessKey.startsWith("****") ? existing[0].secretAccessKey : encrypt(secretAccessKey)
 
     await db
       .update(storageConfig)
@@ -74,7 +76,7 @@ export async function PUT(request: NextRequest) {
       region: region || "us-east-1",
       endpoint: endpoint || null,
       accessKeyId,
-      secretAccessKey,
+      secretAccessKey: encrypt(secretAccessKey),
       pathPrefix: pathPrefix || "",
       createdAt: now,
       updatedAt: now,

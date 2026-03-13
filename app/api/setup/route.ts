@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth"
 import { count, eq } from "drizzle-orm"
 import { getPool, type PgConnectionConfig } from "@/lib/pg/connection"
 import { lockdownPublicConnect } from "@/lib/pg/queries"
+import { encrypt } from "@/lib/crypto"
 
 export async function GET() {
   const [result] = await db.select({ count: count() }).from(user)
@@ -31,9 +32,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (password.length < 8) {
+  if (password.length < 10) {
     return NextResponse.json(
-      { error: "Password must be at least 8 characters" },
+      { error: "Password must be at least 10 characters" },
       { status: 400 }
     )
   }
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
           host: pgHost,
           port: pgPort,
           username: pgUser,
-          password: pgPassword,
+          password: encrypt(pgPassword),
           sslMode: "disable",
           createdAt: now,
           updatedAt: now,

@@ -2,6 +2,7 @@ import { db } from "@/lib/db"
 import { connectionConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { getPool, type PgConnectionConfig } from "@/lib/pg/connection"
+import { decrypt } from "@/lib/crypto"
 import { Pool } from "pg"
 
 export async function getUserPool(userId: string): Promise<Pool | null> {
@@ -18,7 +19,7 @@ export async function getUserPool(userId: string): Promise<Pool | null> {
     host: config.host,
     port: config.port,
     user: config.username,
-    password: config.password || "",
+    password: config.password ? decrypt(config.password) : "",
     ssl: config.sslMode === "require",
   }
 
@@ -42,7 +43,7 @@ export async function getUserPoolForDb(
     host: config.host,
     port: config.port,
     user: config.username,
-    password: config.password || "",
+    password: config.password ? decrypt(config.password) : "",
     database: dbName,
     ssl: config.sslMode === "require",
   }

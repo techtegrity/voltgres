@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/auth-server"
 import { db } from "@/lib/db"
 import { connectionConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { encrypt, decrypt } from "@/lib/crypto"
 
 export async function GET() {
   const session = await getServerSession()
@@ -21,15 +22,19 @@ export async function GET() {
       port: 5432,
       username: "postgres",
       password: "",
+      hasPassword: false,
       sslMode: "prefer",
     })
   }
+
+  const rawPassword = config.password ? decrypt(config.password) : ""
 
   return NextResponse.json({
     host: config.host,
     port: config.port,
     username: config.username,
-    password: config.password || "",
+    password: rawPassword ? "••••••••" : "",
+    hasPassword: !!rawPassword,
     sslMode: config.sslMode,
   })
 }
@@ -49,6 +54,16 @@ export async function PUT(request: NextRequest) {
 
     const now = new Date()
 
+    // Only update password if a real value is provided (not the masked placeholder)
+    let encryptedPassword: string
+    if (password && password !== "••••••••") {
+      encryptedPassword = encrypt(password)
+    } else if (existing[0]) {
+      encryptedPassword = existing[0].password || ""
+    } else {
+      encryptedPassword = ""
+    }
+
     if (existing[0]) {
       await db
         .update(connectionConfig)
@@ -56,7 +71,7 @@ export async function PUT(request: NextRequest) {
           host: host || "localhost",
           port: parseInt(port, 10) || 5432,
           username: username || "postgres",
-          password: password || "",
+          password: encryptedPassword,
           sslMode: sslMode || "prefer",
           updatedAt: now,
         })
@@ -67,7 +82,7 @@ export async function PUT(request: NextRequest) {
         host: host || "localhost",
         port: parseInt(port, 10) || 5432,
         username: username || "postgres",
-        password: password || "",
+        password: encryptedPassword,
         sslMode: sslMode || "prefer",
         createdAt: now,
         updatedAt: now,
@@ -77,6 +92,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return NextResponse.json({ error: "Failed to save connection config" }, { status: 500 })
   }
 }

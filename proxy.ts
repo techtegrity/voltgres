@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isAccessAllowed } from "@/lib/access-control"
+import { isAccessAllowed, getClientIp } from "@/lib/access-control"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 const BLOCKED_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -70,11 +71,52 @@ export async function proxy(req: NextRequest) {
     })
   }
 
-  // Block public registration when disabled
-  if (pathname === "/signup") {
-    const allowRegistration = process.env.ALLOW_REGISTRATION === "true"
-    if (!allowRegistration) {
+  // Rate limit setup and SQL endpoints (auth endpoints are rate-limited by Better Auth)
+  if (pathname === "/api/setup") {
+    const ip = getClientIp(req)
+    const limit = checkRateLimit(`setup:${ip}`, { max: 5, windowMs: 60_000 })
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(limit.resetMs / 1000)),
+          },
+        }
+      )
+    }
+  }
+
+  // Rate limit SQL execution endpoint
+  if (pathname === "/api/pg/sql") {
+    const ip = getClientIp(req)
+    const limit = checkRateLimit(`sql:${ip}`, { max: 30, windowMs: 60_000 })
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(limit.resetMs / 1000)),
+          },
+        }
+      )
+    }
+  }
+
+  // Block public registration when disabled (both UI and API)
+  const allowRegistration = process.env.ALLOW_REGISTRATION === "true"
+  if (!allowRegistration) {
+    if (pathname === "/signup") {
       return NextResponse.redirect(new URL("/login", req.url))
+    }
+    // Block all Better Auth sign-up API endpoints
+    if (pathname.startsWith("/api/auth/sign-up")) {
+      return NextResponse.json(
+        { error: "Registration is disabled" },
+        { status: 403 }
+      )
     }
   }
 
