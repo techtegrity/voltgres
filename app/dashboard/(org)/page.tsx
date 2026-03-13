@@ -43,14 +43,12 @@ import {
   Trash2,
   Copy,
   Link,
-  HardDrive,
   ExternalLink,
   Loader2,
   UserPlus,
   Users,
   CheckCircle2,
   Activity,
-  Zap,
 } from "lucide-react"
 
 function formatBytes(bytes: number) {
@@ -339,68 +337,6 @@ export default function DatabasesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-primary/10">
-                <Database className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{databases.length}</p>
-                <p className="text-sm text-muted-foreground">Total Databases</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-chart-2/10">
-                <HardDrive className="w-5 h-5 text-chart-2" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatBytes(databases.reduce((acc, db) => acc + db.size_bytes, 0))}
-                </p>
-                <p className="text-sm text-muted-foreground">Total Size</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-chart-4/10">
-                <Zap className="w-5 h-5 text-chart-4" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCompact(databases.reduce((acc, db) => acc + db.xact_commit + db.xact_rollback, 0))}
-                </p>
-                <p className="text-sm text-muted-foreground">Total Transactions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-chart-3/10">
-                <Link className="w-5 h-5 text-chart-3" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {databases.reduce((acc, db) => acc + db.active_connections, 0)}
-                </p>
-                <p className="text-sm text-muted-foreground">Active Connections</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Connection Modal */}
