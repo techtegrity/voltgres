@@ -19,5 +19,8 @@ export async function register() {
 
     const { initScheduler } = await import("@/lib/snapshots/scheduler")
     initScheduler()
+
+    const { initDockerCleanup } = await import("@/lib/docker-cleanup")
+    initDockerCleanup()
   }
 }

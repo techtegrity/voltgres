@@ -250,6 +250,26 @@ export interface DiskUsageData {
   pgDataBytes: number
 }
 
+export interface DockerTypeUsage {
+  total: number
+  active: number
+  size: number
+  reclaimable: number
+}
+
+export interface DockerUsageData {
+  available: boolean
+  buildCache: DockerTypeUsage
+  images: DockerTypeUsage
+  containers: DockerTypeUsage
+  volumes: DockerTypeUsage
+}
+
+export interface DockerPruneResult {
+  reclaimedBytes: number
+  message: string
+}
+
 export const api = {
   databases: {
     list: () => apiFetch<DatabaseRow[]>("/api/pg/databases"),
@@ -468,6 +488,12 @@ export const api = {
   system: {
     metrics: () => apiFetch<SystemMetrics>("/api/system/metrics"),
     diskUsage: () => apiFetch<DiskUsageData>("/api/system/disk-usage"),
+    dockerUsage: () => apiFetch<DockerUsageData>("/api/system/docker-usage"),
+    dockerPrune: (target: "build-cache" | "images" | "all") =>
+      apiFetch<DockerPruneResult>("/api/system/docker-prune", {
+        method: "POST",
+        body: JSON.stringify({ target }),
+      }),
     processes: () => apiFetch<ProcessesData>("/api/system/processes"),
   },
 
