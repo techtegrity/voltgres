@@ -21,6 +21,7 @@ import {
   History,
   Sparkles,
 } from "lucide-react"
+import { SqlEditor } from "@/components/sql-editor"
 
 export default function DatabaseSQLPage({
   params,
@@ -30,14 +31,11 @@ export default function DatabaseSQLPage({
   const { id } = use(params)
   const dbName = decodeURIComponent(id)
 
-  const [sqlQuery, setSqlQuery] = useState("SELECT * FROM users LIMIT 10;")
+  const [sqlQuery, setSqlQuery] = useState("")
   const [isExecuting, setIsExecuting] = useState(false)
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null)
   const [queryError, setQueryError] = useState<string | null>(null)
-  const [queryHistory, setQueryHistory] = useState<string[]>([
-    "SELECT * FROM users LIMIT 10;",
-    "SELECT COUNT(*) FROM posts;",
-  ])
+  const [queryHistory, setQueryHistory] = useState<string[]>([])
 
   const executeQuery = async () => {
     setIsExecuting(true)
@@ -59,10 +57,9 @@ export default function DatabaseSQLPage({
   }
 
   const exampleQueries = [
-    { label: "Select all", query: "SELECT * FROM users LIMIT 100;" },
-    { label: "Count rows", query: "SELECT COUNT(*) FROM users;" },
-    { label: "Show tables", query: "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" },
-    { label: "Table info", query: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users';" },
+    { label: "Show tables", query: "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;" },
+    { label: "Table info", query: "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'TABLE_NAME' ORDER BY ordinal_position;" },
+    { label: "Table sizes", query: "SELECT relname AS table, pg_size_pretty(pg_total_relation_size(relid)) AS size FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC;" },
   ]
 
   return (
@@ -99,17 +96,10 @@ export default function DatabaseSQLPage({
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <textarea
+                <SqlEditor
                   value={sqlQuery}
-                  onChange={(e) => setSqlQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                      executeQuery()
-                    }
-                  }}
-                  className="w-full h-32 p-4 rounded-lg bg-muted border border-border font-mono text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Enter your SQL query..."
-                  spellCheck={false}
+                  onChange={setSqlQuery}
+                  onExecute={executeQuery}
                 />
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
