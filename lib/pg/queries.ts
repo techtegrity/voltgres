@@ -880,6 +880,124 @@ export async function terminateBackend(pool: Pool, pid: number): Promise<boolean
   return result.rows[0]?.terminated ?? false
 }
 
+// ── pg_stat_statements (server-level query tracking) ──────────────────
+
+export interface PgStatStatementEntry {
+  queryid: string
+  query: string
+  calls: number
+  total_exec_time: number
+  mean_exec_time: number
+  min_exec_time: number
+  max_exec_time: number
+  rows: number
+  shared_blks_hit: number
+  shared_blks_read: number
+  dbname: string | null
+  rolname: string | null
+}
+
+/**
+ * Check whether pg_stat_statements extension is available on the server
+ * (listed in shared_preload_libraries) and whether the extension is
+ * installed in the current database.
+ */
+export async function checkPgStatStatements(pool: Pool): Promise<{
+  preloaded: boolean
+  installed: boolean
+}> {
+  // Check if it's in shared_preload_libraries
+  const preloadResult = await pool.query(
+    `SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'`
+  )
+  const preloaded = (preloadResult.rows[0]?.setting ?? "")
+    .split(",")
+    .map((s: string) => s.trim())
+    .includes("pg_stat_statements")
+
+  // Check if the extension is installed in the current database
+  const extResult = await pool.query(
+    `SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'`
+  )
+  const installed = extResult.rows.length > 0
+
+  return { preloaded, installed }
+}
+
+/**
+ * Try to install pg_stat_statements extension. Returns true if successful.
+ * Requires that pg_stat_statements is listed in shared_preload_libraries.
+ */
+export async function enablePgStatStatements(pool: Pool): Promise<boolean> {
+  try {
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Fetch aggregated query statistics from pg_stat_statements.
+ * Optionally filter by database name.
+ */
+export async function getPgStatStatements(
+  pool: Pool,
+  opts: { database?: string; limit?: number; search?: string } = {}
+): Promise<PgStatStatementEntry[]> {
+  const { database, limit = 100, search } = opts
+  const params: unknown[] = []
+  const conditions: string[] = []
+  let paramIdx = 1
+
+  if (database) {
+    conditions.push(`d.datname = $${paramIdx++}`)
+    params.push(database)
+  }
+
+  if (search) {
+    conditions.push(`s.query ILIKE $${paramIdx++}`)
+    params.push(`%${search}%`)
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+
+  params.push(limit)
+
+  const result = await pool.query(
+    `
+    SELECT
+      s.queryid::text AS queryid,
+      LEFT(s.query, 2000) AS query,
+      s.calls::bigint AS calls,
+      ROUND(s.total_exec_time::numeric, 2) AS total_exec_time,
+      ROUND(s.mean_exec_time::numeric, 2) AS mean_exec_time,
+      ROUND(s.min_exec_time::numeric, 2) AS min_exec_time,
+      ROUND(s.max_exec_time::numeric, 2) AS max_exec_time,
+      s.rows::bigint AS rows,
+      s.shared_blks_hit::bigint AS shared_blks_hit,
+      s.shared_blks_read::bigint AS shared_blks_read,
+      d.datname AS dbname,
+      r.rolname AS rolname
+    FROM pg_stat_statements s
+    LEFT JOIN pg_database d ON d.oid = s.dbid
+    LEFT JOIN pg_roles r ON r.oid = s.userid
+    ${where}
+    ORDER BY s.total_exec_time DESC
+    LIMIT $${paramIdx}
+    `,
+    params
+  )
+  return result.rows
+}
+
+/**
+ * Reset all pg_stat_statements counters.
+ */
+export async function resetPgStatStatements(pool: Pool): Promise<void> {
+  await pool.query(`SELECT pg_stat_statements_reset()`)
+}
+
 export async function getServerInfo(pool: Pool) {
   const versionResult = await pool.query("SELECT version()")
   const uptimeResult = await pool.query(

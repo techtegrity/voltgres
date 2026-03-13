@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { useQueryLog, useQueryLogDetail, useQueryLogStats } from "@/hooks/use-query-log"
+import { useStatStatements } from "@/hooks/use-stat-statements"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -26,6 +28,9 @@ import {
   Loader2,
   Activity,
   RefreshCw,
+  Server,
+  Info,
+  RotateCcw,
 } from "lucide-react"
 
 const SIZE_WARNING_BYTES = 50 * 1024 * 1024 // 50 MB
@@ -52,6 +57,18 @@ function truncateQuery(query: string, maxLen = 80) {
   return query.slice(0, maxLen) + "..."
 }
 
+function formatMs(ms: number) {
+  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
+  if (ms < 1000) return `${ms.toFixed(1)}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
+function formatNumber(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
 function commandBadgeVariant(command: string) {
   switch (command.toUpperCase()) {
     case "SELECT":
@@ -70,6 +87,279 @@ function commandBadgeVariant(command: string) {
 }
 
 export default function ActivityPage() {
+  const [tab, setTab] = useState("server")
+
+  return (
+    <div className="p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <Activity className="w-6 h-6" />
+          Activity
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Query activity across all databases
+        </p>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="server" className="gap-2">
+            <Server className="w-4 h-4" />
+            Server Queries
+          </TabsTrigger>
+          <TabsTrigger value="app" className="gap-2">
+            <Activity className="w-4 h-4" />
+            App Queries
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="server">
+          <ServerQueriesTab />
+        </TabsContent>
+
+        <TabsContent value="app">
+          <AppQueriesTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+/* ── Server Queries (pg_stat_statements) ─────────────────────────────── */
+
+function ServerQueriesTab() {
+  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+
+  const { entries, available, reason, loading, refresh, reset } = useStatStatements({
+    search,
+    autoRefresh: true,
+  })
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSearch(searchInput)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!available) {
+    return (
+      <Card className="bg-card border-border">
+        <CardContent className="py-12">
+          <div className="text-center space-y-3">
+            <Server className="w-10 h-10 mx-auto text-muted-foreground opacity-50" />
+            <div>
+              <p className="font-medium text-foreground">
+                pg_stat_statements is not available
+              </p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                {reason === "not_preloaded" ? (
+                  <>
+                    This extension must be added to <code className="text-xs bg-muted px-1 py-0.5 rounded">shared_preload_libraries</code> in
+                    your PostgreSQL configuration file (postgresql.conf) and requires a server restart.
+                  </>
+                ) : (
+                  "Could not install the pg_stat_statements extension. Check your PostgreSQL user permissions."
+                )}
+              </p>
+            </div>
+            <div className="pt-2">
+              <div className="text-left max-w-sm mx-auto bg-muted/50 rounded-lg p-4 text-xs font-mono space-y-1">
+                <p className="text-muted-foreground"># In postgresql.conf:</p>
+                <p>shared_preload_libraries = &apos;pg_stat_statements&apos;</p>
+                <p className="text-muted-foreground mt-2"># Then restart PostgreSQL</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <>
+      {/* Info banner */}
+      <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+        <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+        <span className="text-muted-foreground">
+          Server queries show aggregated statistics from <strong>all clients</strong> — including external apps, scripts, and direct connections. Sorted by total execution time.
+        </span>
+      </div>
+
+      {/* Search + actions */}
+      <div className="mb-4 flex gap-2">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search queries..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" variant="secondary" size="sm">
+            Search
+          </Button>
+          {search && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("")
+                setSearchInput("")
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </form>
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+        <Button variant="outline" size="sm" onClick={reset} className="gap-2">
+          <RotateCcw className="w-4 h-4" />
+          Reset Stats
+        </Button>
+      </div>
+
+      {/* Table */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {entries.length} query {entries.length === 1 ? "pattern" : "patterns"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {entries.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Server className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No query statistics recorded yet</p>
+              <p className="text-xs mt-1">
+                Execute queries from any client to see them here
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border bg-muted/50">
+                    <TableHead>Query</TableHead>
+                    <TableHead className="w-[100px]">Database</TableHead>
+                    <TableHead className="w-[80px]">User</TableHead>
+                    <TableHead className="w-[70px] text-right">Calls</TableHead>
+                    <TableHead className="w-[90px] text-right">Total Time</TableHead>
+                    <TableHead className="w-[80px] text-right">Avg Time</TableHead>
+                    <TableHead className="w-[70px] text-right">Rows</TableHead>
+                    <TableHead className="w-[90px] text-right">Cache Hit %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <StatStatementRow key={entry.queryid} entry={entry} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+function StatStatementRow({
+  entry,
+}: {
+  entry: {
+    queryid: string
+    query: string
+    calls: number
+    total_exec_time: number
+    mean_exec_time: number
+    rows: number
+    shared_blks_hit: number
+    shared_blks_read: number
+    dbname: string | null
+    rolname: string | null
+  }
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const totalBlocks = entry.shared_blks_hit + entry.shared_blks_read
+  const cacheHitPct = totalBlocks > 0 ? ((entry.shared_blks_hit / totalBlocks) * 100).toFixed(1) : "-"
+
+  return (
+    <>
+      <TableRow
+        className="border-border cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <TableCell className="font-mono text-xs max-w-[400px]">
+          <span className="break-all">{truncateQuery(entry.query)}</span>
+        </TableCell>
+        <TableCell>
+          <span className="inline-flex items-center gap-1 text-xs font-mono">
+            <Database className="w-3 h-3 text-muted-foreground" />
+            {entry.dbname ?? "-"}
+          </span>
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground">
+          {entry.rolname ?? "-"}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums font-medium">
+          {formatNumber(entry.calls)}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatMs(entry.total_exec_time)}
+          </span>
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+          {formatMs(entry.mean_exec_time)}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums">
+          {formatNumber(entry.rows)}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums">
+          {cacheHitPct !== "-" ? (
+            <span className={Number(cacheHitPct) < 90 ? "text-yellow-500" : "text-primary"}>
+              {cacheHitPct}%
+            </span>
+          ) : (
+            "-"
+          )}
+        </TableCell>
+      </TableRow>
+
+      {expanded && (
+        <TableRow className="border-border bg-muted/30">
+          <TableCell colSpan={8} className="p-4">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Full Query</p>
+              <pre className="p-3 rounded-lg bg-background border border-border text-xs font-mono whitespace-pre-wrap max-h-40 overflow-auto">
+                {entry.query}
+              </pre>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  )
+}
+
+/* ── App Queries (SQLite query log) ──────────────────────────────────── */
+
+function AppQueriesTab() {
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
   const [page, setPage] = useState(1)
@@ -95,21 +385,13 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Activity className="w-6 h-6" />
-            Activity
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Query log across all databases
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </Button>
+    <>
+      {/* Info banner */}
+      <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+        <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+        <span className="text-muted-foreground">
+          App queries show individual executions made through Voltgres — the SQL editor and table operations. External app queries won&apos;t appear here; check the <strong>Server Queries</strong> tab instead.
+        </span>
       </div>
 
       {/* Disk usage warnings */}
@@ -132,34 +414,40 @@ export default function ActivityPage() {
       )}
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search queries..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button type="submit" variant="secondary" size="sm">
-          Search
-        </Button>
-        {search && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearch("")
-              setSearchInput("")
-              setPage(1)
-            }}
-          >
-            Clear
+      <div className="mb-4 flex gap-2">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search queries..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" variant="secondary" size="sm">
+            Search
           </Button>
-        )}
-      </form>
+          {search && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("")
+                setSearchInput("")
+                setPage(1)
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </form>
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
 
       {/* Table */}
       <Card className="bg-card border-border">
@@ -224,7 +512,7 @@ export default function ActivityPage() {
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry) => (
-                    <QueryRow
+                    <AppQueryRow
                       key={entry.id}
                       entry={entry}
                       isExpanded={expandedId === entry.id}
@@ -241,11 +529,11 @@ export default function ActivityPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   )
 }
 
-function QueryRow({
+function AppQueryRow({
   entry,
   isExpanded,
   detail,

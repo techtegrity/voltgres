@@ -270,6 +270,27 @@ export interface DockerPruneResult {
   message: string
 }
 
+export interface PgStatStatementEntry {
+  queryid: string
+  query: string
+  calls: number
+  total_exec_time: number
+  mean_exec_time: number
+  min_exec_time: number
+  max_exec_time: number
+  rows: number
+  shared_blks_hit: number
+  shared_blks_read: number
+  dbname: string | null
+  rolname: string | null
+}
+
+export interface PgStatStatementsResult {
+  available: boolean
+  reason?: "not_preloaded" | "install_failed"
+  entries: PgStatStatementEntry[]
+}
+
 export interface QueryLogEntry {
   id: string
   userId: string
@@ -602,6 +623,29 @@ export const api = {
       >("/api/pg/import/tables", {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+  },
+
+  statStatements: {
+    get: (opts?: { db?: string; search?: string; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (opts?.db) params.set("db", opts.db)
+      if (opts?.search) params.set("search", opts.search)
+      if (opts?.limit) params.set("limit", String(opts.limit))
+      const qs = params.toString()
+      return apiFetch<PgStatStatementsResult>(
+        `/api/pg/stat-statements${qs ? `?${qs}` : ""}`
+      )
+    },
+    enable: () =>
+      apiFetch<{ success: boolean }>("/api/pg/stat-statements", {
+        method: "POST",
+        body: JSON.stringify({ action: "enable" }),
+      }),
+    reset: () =>
+      apiFetch<{ success: boolean }>("/api/pg/stat-statements", {
+        method: "POST",
+        body: JSON.stringify({ action: "reset" }),
       }),
   },
 
