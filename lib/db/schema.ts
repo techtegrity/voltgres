@@ -121,6 +121,17 @@ export const accessRule = sqliteTable("access_rule", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 })
 
+export const pgUserPassword = sqliteTable("pg_user_password", {
+  id: text("id").primaryKey(),
+  pgUsername: text("pg_username").notNull(),
+  encryptedPassword: text("encrypted_password").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+})
+
 export const snapshot = sqliteTable("snapshot", {
   id: text("id").primaryKey(),
   database: text("database").notNull(),

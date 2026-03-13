@@ -1,38 +1,36 @@
 "use client"
 
-import { useState, useCallback } from "react"
-
-const STORAGE_KEY = "voltgres:known-passwords"
-
-function load(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  try {
-    return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}")
-  } catch {
-    return {}
-  }
-}
-
-function save(data: Record<string, string>) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    // quota exceeded — ignore
-  }
-}
+import { useState, useCallback, useEffect } from "react"
+import { api } from "@/lib/api-client"
 
 /**
- * Stores user passwords in sessionStorage so they survive
- * page navigations but are cleared when the browser tab closes.
+ * Stores PG user passwords server-side (encrypted at rest) so they persist
+ * across browser sessions. Also keeps a local in-memory cache for immediate
+ * access during the current session.
  */
 export function useKnownPasswords() {
-  const [passwords, setPasswords] = useState<Record<string, string>>(load)
+  const [passwords, setPasswords] = useState<Record<string, string>>({})
+  const [loaded, setLoaded] = useState(false)
+
+  // Fetch persisted passwords from the server on mount
+  useEffect(() => {
+    api.userPasswords
+      .list()
+      .then((serverPasswords) => {
+        setPasswords((prev) => ({ ...serverPasswords, ...prev }))
+        setLoaded(true)
+      })
+      .catch(() => {
+        setLoaded(true)
+      })
+  }, [])
 
   const setPassword = useCallback((username: string, password: string) => {
-    setPasswords((prev) => {
-      const next = { ...prev, [username]: password }
-      save(next)
-      return next
+    // Update local state immediately
+    setPasswords((prev) => ({ ...prev, [username]: password }))
+    // Persist to server (fire-and-forget)
+    api.userPasswords.save(username, password).catch(() => {
+      // Silently fail — the local cache still works for this session
     })
   }, [])
 
@@ -43,5 +41,5 @@ export function useKnownPasswords() {
     [passwords]
   )
 
-  return { passwords, setPassword, getPassword }
+  return { passwords, setPassword, getPassword, loaded }
 }

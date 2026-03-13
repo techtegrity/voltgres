@@ -45,6 +45,16 @@ export default function StorageSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true)
+    const payload = {
+      provider,
+      bucket,
+      region,
+      endpoint: provider === "r2" ? endpoint : undefined,
+      accessKeyId,
+      secretAccessKey: secretAccessKey ? `[${secretAccessKey.length} chars]` : "[empty]",
+      pathPrefix,
+    }
+    console.log("[StorageSave] Saving with payload:", payload)
     try {
       await save({
         provider,
@@ -55,9 +65,11 @@ export default function StorageSettingsPage() {
         secretAccessKey,
         pathPrefix,
       })
+      console.log("[StorageSave] Save + refresh completed successfully")
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
+      console.error("[StorageSave] Error:", err)
       setTestResult({
         success: false,
         message: (err as Error).message || "Failed to save",

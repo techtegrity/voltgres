@@ -47,43 +47,56 @@ export async function PUT(request: NextRequest) {
     )
   }
 
-  const now = new Date()
-  const existing = await db.select().from(storageConfig).limit(1)
+  try {
+    const now = new Date()
+    const existing = await db.select().from(storageConfig).limit(1)
+    console.log("[StorageAPI] PUT: existing config?", existing.length > 0)
 
-  if (existing.length > 0) {
-    // Check if secretAccessKey is the masked value — if so, keep the old one
-    const actualSecret =
-      secretAccessKey.startsWith("****") ? existing[0].secretAccessKey : encrypt(secretAccessKey)
+    if (existing.length > 0) {
+      // Check if secretAccessKey is the masked value — if so, keep the old one
+      const isMasked = secretAccessKey.startsWith("****")
+      console.log("[StorageAPI] PUT: secret is masked?", isMasked)
+      const actualSecret = isMasked ? existing[0].secretAccessKey : encrypt(secretAccessKey)
 
-    await db
-      .update(storageConfig)
-      .set({
+      await db
+        .update(storageConfig)
+        .set({
+          provider,
+          bucket,
+          region: region || "us-east-1",
+          endpoint: endpoint || null,
+          accessKeyId,
+          secretAccessKey: actualSecret,
+          pathPrefix: pathPrefix || "",
+          updatedAt: now,
+        })
+        .where(eq(storageConfig.id, existing[0].id))
+      console.log("[StorageAPI] PUT: updated successfully")
+    } else {
+      console.log("[StorageAPI] PUT: inserting new config")
+      await db.insert(storageConfig).values({
+        id: crypto.randomUUID(),
         provider,
         bucket,
         region: region || "us-east-1",
         endpoint: endpoint || null,
         accessKeyId,
-        secretAccessKey: actualSecret,
+        secretAccessKey: encrypt(secretAccessKey),
         pathPrefix: pathPrefix || "",
+        createdAt: now,
         updatedAt: now,
       })
-      .where(eq(storageConfig.id, existing[0].id))
-  } else {
-    await db.insert(storageConfig).values({
-      id: crypto.randomUUID(),
-      provider,
-      bucket,
-      region: region || "us-east-1",
-      endpoint: endpoint || null,
-      accessKeyId,
-      secretAccessKey: encrypt(secretAccessKey),
-      pathPrefix: pathPrefix || "",
-      createdAt: now,
-      updatedAt: now,
-    })
-  }
+      console.log("[StorageAPI] PUT: inserted successfully")
+    }
 
-  return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error("[StorageAPI] PUT error:", err)
+    return NextResponse.json(
+      { error: (err as Error).message || "Failed to save storage config" },
+      { status: 500 }
+    )
+  }
 }
 
 export async function DELETE() {

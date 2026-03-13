@@ -317,6 +317,17 @@ export const api = {
       apiFetch(`/api/config/backups/${id}`, { method: "DELETE" }),
   },
 
+  userPasswords: {
+    /** Fetch all stored PG user passwords (decrypted) for current user */
+    list: () => apiFetch<Record<string, string>>("/api/pg/user-passwords"),
+    /** Store or update a PG user password */
+    save: (username: string, password: string) =>
+      apiFetch<{ success: boolean }>("/api/pg/user-passwords", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      }),
+  },
+
   server: {
     info: () => apiFetch<ServerInfo>("/api/pg/server-info"),
   },

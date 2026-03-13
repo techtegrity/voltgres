@@ -9,12 +9,15 @@ export function useStorageConfig() {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
+    console.log("[StorageHook] refresh: fetching config...")
     setLoading(true)
     setError(null)
     try {
       const data = await api.storage.get()
+      console.log("[StorageHook] refresh: got config", data ? "exists" : "null")
       setConfig(data)
     } catch (err) {
+      console.error("[StorageHook] refresh error:", err)
       setError((err as Error).message)
     } finally {
       setLoading(false)
@@ -35,8 +38,12 @@ export function useStorageConfig() {
       secretAccessKey: string
       pathPrefix?: string
     }) => {
-      await api.storage.save(data)
+      console.log("[StorageHook] save: calling PUT...")
+      const result = await api.storage.save(data)
+      console.log("[StorageHook] save: PUT result:", result)
+      console.log("[StorageHook] save: calling refresh...")
       await refresh()
+      console.log("[StorageHook] save: refresh done")
     },
     [refresh]
   )

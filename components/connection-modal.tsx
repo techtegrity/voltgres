@@ -198,6 +198,17 @@ export function ConnectionModal({
     setResetSuccess(false)
   }, [selectedDb, bestDefaultUser, filteredUsers])
 
+  // Fetch all stored user passwords from server when modal opens
+  const [serverPasswords, setServerPasswords] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!open) return
+    setServerPasswords({})
+    api.userPasswords
+      .list()
+      .then(setServerPasswords)
+      .catch(() => {})
+  }, [open])
+
   // Determine the password to display
   const currentPassword = useMemo(() => {
     if (tempPassword) return tempPassword
@@ -206,8 +217,9 @@ export function ConnectionModal({
       return revealedAdminPassword
     }
     if (knownPasswords?.[selectedUser]) return knownPasswords[selectedUser]
+    if (serverPasswords[selectedUser]) return serverPasswords[selectedUser]
     return null
-  }, [tempPassword, selectedUser, effectiveAdminUsername, revealedAdminPassword, knownPasswords])
+  }, [tempPassword, selectedUser, effectiveAdminUsername, revealedAdminPassword, knownPasswords, serverPasswords])
 
   const displayPassword = currentPassword
     ? showPassword
@@ -261,8 +273,12 @@ export function ConnectionModal({
       setTempPassword(newPassword)
       setShowPassword(true)
       setResetSuccess(true)
+      // Update local server passwords cache so it's immediately available
+      setServerPasswords((prev) => ({ ...prev, [selectedUser]: newPassword }))
       onUsersRefresh?.()
       onPasswordReset?.(selectedUser, newPassword)
+      // Also persist to server-side password store
+      api.userPasswords.save(selectedUser, newPassword).catch(() => {})
       setTimeout(() => setResetSuccess(false), 3000)
     } catch {
       // Could add error handling here
