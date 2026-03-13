@@ -284,21 +284,31 @@ function ServerQueriesTab({ database }: { database: string }) {
 }
 
 function StatStatementRow({
-  entry,
+  entry: raw,
 }: {
   entry: {
     queryid: string
     query: string
-    calls: number
-    total_exec_time: number
-    mean_exec_time: number
-    rows: number
-    shared_blks_hit: number
-    shared_blks_read: number
+    calls: number | string
+    total_exec_time: number | string
+    mean_exec_time: number | string
+    rows: number | string
+    shared_blks_hit: number | string
+    shared_blks_read: number | string
     rolname: string | null
   }
 }) {
   const [expanded, setExpanded] = useState(false)
+  // PostgreSQL numeric/bigint types serialize as strings in JSON
+  const entry = {
+    ...raw,
+    calls: Number(raw.calls),
+    total_exec_time: Number(raw.total_exec_time),
+    mean_exec_time: Number(raw.mean_exec_time),
+    rows: Number(raw.rows),
+    shared_blks_hit: Number(raw.shared_blks_hit),
+    shared_blks_read: Number(raw.shared_blks_read),
+  }
   const totalBlocks = entry.shared_blks_hit + entry.shared_blks_read
   const cacheHitPct = totalBlocks > 0 ? ((entry.shared_blks_hit / totalBlocks) * 100).toFixed(1) : "-"
 

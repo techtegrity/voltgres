@@ -137,6 +137,33 @@ export function TablePrivilegesGrid({ dbName }: Props) {
     }
   }
 
+  const handleToggleColumn = async (privilege: TablePrivKey) => {
+    if (isSuperuser) return
+    // Check if all non-owner tables have this privilege — if so, revoke all; otherwise grant all
+    const toggleableRows = filteredRows.filter((r) => !r.is_table_owner)
+    if (toggleableRows.length === 0) return
+    const allHave = toggleableRows.every((r) => r[privilege])
+    const action = allHave ? "revoke" : "grant"
+
+    setToggling(`column:${privilege}`)
+    try {
+      for (const row of toggleableRows) {
+        if ((action === "grant" && !row[privilege]) || (action === "revoke" && row[privilege])) {
+          await api.databases.updateTablePrivilege(dbName, {
+            username: selectedUser,
+            schema: row.schema,
+            table: row.table_name,
+            privilege: privilege.toUpperCase(),
+            action,
+          })
+        }
+      }
+      await loadPrivileges()
+    } finally {
+      setToggling(null)
+    }
+  }
+
   const handleTransferOwnership = async () => {
     if (!transferTarget || !transferTo) return
     setToggling("transfer")
@@ -234,14 +261,51 @@ export function TablePrivilegesGrid({ dbName }: Props) {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground w-[120px]">
                     Owner
                   </th>
-                  {TABLE_PRIVILEGES.map((priv) => (
-                    <th
-                      key={priv}
-                      className="text-center px-2 py-2 font-medium text-muted-foreground w-[80px] uppercase text-xs"
-                    >
-                      {priv === "references" ? "Refs" : priv}
-                    </th>
-                  ))}
+                  {TABLE_PRIVILEGES.map((priv) => {
+                    const toggleableRows = filteredRows.filter((r) => !r.is_table_owner)
+                    const allHave = toggleableRows.length > 0 && toggleableRows.every((r) => r[priv])
+                    const noneHave = toggleableRows.length > 0 && toggleableRows.every((r) => !r[priv])
+                    const isColumnToggling = toggling === `column:${priv}`
+                    const canToggle = !isSuperuser && toggleableRows.length > 0 && !toggling
+
+                    return (
+                      <th
+                        key={priv}
+                        className="text-center px-2 py-2 w-[80px]"
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={`uppercase text-xs font-medium transition-colors ${
+                                canToggle
+                                  ? "cursor-pointer hover:text-foreground"
+                                  : "cursor-default"
+                              } ${
+                                allHave
+                                  ? "text-primary"
+                                  : noneHave
+                                    ? "text-muted-foreground/50"
+                                    : "text-muted-foreground"
+                              }`}
+                              disabled={!canToggle}
+                              onClick={() => canToggle && handleToggleColumn(priv)}
+                            >
+                              {isColumnToggling ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
+                              ) : (
+                                priv === "references" ? "Refs" : priv
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              {allHave ? "Revoke" : "Grant"} {priv.toUpperCase()} on all tables
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
