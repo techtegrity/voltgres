@@ -115,7 +115,7 @@ export async function testStorageConnection(config: {
   secretAccessKey: string
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const client = new S3Client({
+    const clientConfig = {
       region: config.region,
       endpoint: config.endpoint || undefined,
       credentials: {
@@ -123,14 +123,32 @@ export async function testStorageConnection(config: {
         secretAccessKey: config.secretAccessKey,
       },
       forcePathStyle: !!config.endpoint,
+    }
+    console.log("[StorageTest] S3 client config:", {
+      region: clientConfig.region,
+      endpoint: clientConfig.endpoint,
+      forcePathStyle: clientConfig.forcePathStyle,
+      accessKeyId: clientConfig.credentials.accessKeyId,
+      bucket: config.bucket,
     })
 
+    const client = new S3Client(clientConfig)
+
     await client.send(new HeadBucketCommand({ Bucket: config.bucket }))
+    console.log("[StorageTest] HeadBucket succeeded")
     return { success: true }
-  } catch (err) {
+  } catch (err: unknown) {
+    const e = err as Error & { name?: string; $metadata?: Record<string, unknown>; Code?: string }
+    console.error("[StorageTest] HeadBucket failed:", {
+      name: e.name,
+      message: e.message,
+      code: e.Code,
+      metadata: e.$metadata,
+    })
+    const detail = [e.name, e.message, e.Code].filter(Boolean).join(": ")
     return {
       success: false,
-      error: (err as Error).message || "Connection failed",
+      error: detail || "Connection failed",
     }
   }
 }
