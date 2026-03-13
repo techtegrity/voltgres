@@ -280,6 +280,128 @@ export async function regrantDatabaseSchemas(pool: Pool, dbName: string) {
   }
 }
 
+// ── Database-level privilege introspection & management ───────────────
+
+export interface DatabaseUserPrivileges {
+  username: string
+  is_owner: boolean
+  superuser: boolean
+  can_login: boolean
+  connect: boolean
+  create: boolean
+  temporary: boolean
+  connection_limit: number // -1 = unlimited
+}
+
+/**
+ * Get per-user privilege breakdown for a specific database.
+ * Returns every non-system role that has at least CONNECT,
+ * plus the owner and superusers.
+ */
+export async function getDatabasePrivileges(
+  pool: Pool,
+  dbName: string
+): Promise<DatabaseUserPrivileges[]> {
+  const result = await pool.query(
+    `
+    SELECT
+      r.rolname                                          AS username,
+      r.rolsuper                                         AS superuser,
+      r.rolcanlogin                                      AS can_login,
+      r.rolconnlimit                                     AS connection_limit,
+      (d.datdba = r.oid)                                 AS is_owner,
+      has_database_privilege(r.oid, d.oid, 'CONNECT')    AS connect,
+      has_database_privilege(r.oid, d.oid, 'CREATE')     AS "create",
+      has_database_privilege(r.oid, d.oid, 'TEMPORARY')  AS temporary
+    FROM pg_roles r
+    CROSS JOIN pg_database d
+    WHERE d.datname = $1
+      AND r.rolname NOT LIKE 'pg_%'
+    ORDER BY
+      (d.datdba = r.oid) DESC,  -- owner first
+      r.rolsuper DESC,           -- then superusers
+      r.rolname ASC
+    `,
+    [dbName]
+  )
+  // Only return roles that actually have some form of access
+  return result.rows.filter(
+    (r: DatabaseUserPrivileges) => r.connect || r.create || r.temporary || r.is_owner || r.superuser
+  )
+}
+
+const VALID_DB_PRIVILEGES = ["CONNECT", "CREATE", "TEMPORARY"] as const
+type DbPrivilege = (typeof VALID_DB_PRIVILEGES)[number]
+
+export async function grantDatabasePrivilege(
+  pool: Pool,
+  username: string,
+  dbName: string,
+  privilege: string
+) {
+  const priv = privilege.toUpperCase() as DbPrivilege
+  if (!VALID_DB_PRIVILEGES.includes(priv)) {
+    throw new Error(`Invalid privilege: ${privilege}`)
+  }
+  const safeUsername = username.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`GRANT ${priv} ON DATABASE "${safeDbName}" TO "${safeUsername}"`)
+
+  // If granting CREATE, also grant schema-level privileges so the user
+  // can actually use schemas and objects within the database.
+  if (priv === "CREATE") {
+    const dbPool = await getDbPool(pool, safeDbName)
+    try {
+      await grantAllSchemas(dbPool, safeUsername)
+    } finally {
+      await dbPool.end()
+    }
+  }
+}
+
+export async function revokeDatabasePrivilege(
+  pool: Pool,
+  username: string,
+  dbName: string,
+  privilege: string
+) {
+  const priv = privilege.toUpperCase() as DbPrivilege
+  if (!VALID_DB_PRIVILEGES.includes(priv)) {
+    throw new Error(`Invalid privilege: ${privilege}`)
+  }
+  const safeUsername = username.replace(/[^a-zA-Z0-9_]/g, "_")
+  const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`REVOKE ${priv} ON DATABASE "${safeDbName}" FROM "${safeUsername}"`)
+
+  // If revoking CREATE, also revoke schema-level privileges
+  if (priv === "CREATE") {
+    const dbPool = await getDbPool(pool, safeDbName)
+    try {
+      const { rows } = await dbPool.query(`
+        SELECT nspname FROM pg_namespace
+        WHERE nspname NOT LIKE 'pg_%' AND nspname <> 'information_schema'
+      `)
+      for (const row of rows) {
+        const schema = (row.nspname as string).replace(/[^a-zA-Z0-9_]/g, "_")
+        await dbPool.query(`REVOKE ALL ON SCHEMA "${schema}" FROM "${safeUsername}"`)
+        await dbPool.query(`REVOKE ALL ON ALL TABLES IN SCHEMA "${schema}" FROM "${safeUsername}"`)
+        await dbPool.query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA "${schema}" FROM "${safeUsername}"`)
+      }
+    } finally {
+      await dbPool.end()
+    }
+  }
+}
+
+export async function updateConnectionLimit(
+  pool: Pool,
+  username: string,
+  limit: number
+) {
+  const safeUsername = username.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(`ALTER ROLE "${safeUsername}" CONNECTION LIMIT ${limit}`)
+}
+
 export async function grantAccess(
   pool: Pool,
   username: string,

@@ -47,6 +47,17 @@ export interface PgUserRow {
   databases: string[]
 }
 
+export interface DatabaseUserPrivileges {
+  username: string
+  is_owner: boolean
+  superuser: boolean
+  can_login: boolean
+  connect: boolean
+  create: boolean
+  temporary: boolean
+  connection_limit: number
+}
+
 export interface TableRow {
   name: string
   schema: string
@@ -158,6 +169,23 @@ export const api = {
     delete: (name: string) =>
       apiFetch(`/api/pg/databases/${encodeURIComponent(name)}`, {
         method: "DELETE",
+      }),
+    privileges: (name: string) =>
+      apiFetch<DatabaseUserPrivileges[]>(
+        `/api/pg/databases/${encodeURIComponent(name)}/privileges`
+      ),
+    updatePrivilege: (
+      name: string,
+      data: {
+        username: string
+        privilege?: string
+        action?: "grant" | "revoke"
+        connectionLimit?: number
+      }
+    ) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/privileges`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
       }),
   },
 

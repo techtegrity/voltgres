@@ -15,6 +15,7 @@ import {
   Table2,
   HardDrive,
   Users,
+  Shield,
   ArrowLeft,
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -46,6 +47,7 @@ export function DatabaseSidebar({ databaseId, databaseName }: DatabaseSidebarPro
     { name: "Tables", href: `${basePath}/tables`, icon: Table2 },
     { name: "Backup & Restore", href: `${basePath}/backups`, icon: HardDrive },
     { name: "Users", href: `${basePath}/users`, icon: Users },
+    { name: "Access Control", href: `${basePath}/access`, icon: Shield },
   ]
 
   const isActive = (href: string) => {
