@@ -392,7 +392,7 @@ export default function DatabaseTablesPage({
                 ) : (
                   /* Structure tab */
                   <div className="flex-1 min-h-0 overflow-auto p-4">
-                    <TableStructureView columns={tableData.columnMeta} />
+                    <TableStructureView columns={tableData.columnMeta} owner={selectedTableMeta?.owner} />
                   </div>
                 )}
               </div>

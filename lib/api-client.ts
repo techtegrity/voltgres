@@ -86,6 +86,7 @@ export interface TableRow {
   name: string
   schema: string
   row_count: number
+  owner: string
 }
 
 export interface ColumnRow {

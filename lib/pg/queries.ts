@@ -217,6 +217,17 @@ async function grantAllSchemas(dbPool: Pool, safeRole: string) {
     // Grant on existing objects (e.g. tables created during import/restore)
     await dbPool.query(`GRANT ALL ON ALL TABLES IN SCHEMA "${schema}" TO "${safeRole}"`)
     await dbPool.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA "${schema}" TO "${safeRole}"`)
+    // Transfer ownership of existing tables/sequences so the role can run DDL (ALTER TABLE, etc.)
+    await dbPool.query(`
+      DO $$ DECLARE r RECORD; BEGIN
+        FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = '${schema}'
+                   AND tableowner <> '${safeRole}'
+        LOOP EXECUTE format('ALTER TABLE "${schema}".%I OWNER TO "${safeRole}"', r.tablename); END LOOP;
+        FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = '${schema}'
+                   AND sequenceowner <> '${safeRole}'
+        LOOP EXECUTE format('ALTER SEQUENCE "${schema}".%I OWNER TO "${safeRole}"', r.sequencename); END LOOP;
+      END $$;
+    `)
     // Grant on future objects created by the admin role in this schema
     await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" GRANT ALL ON TABLES TO "${safeRole}"`)
     await dbPool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA "${schema}" GRANT ALL ON SEQUENCES TO "${safeRole}"`)
@@ -513,7 +524,9 @@ export async function listTables(pool: Pool) {
       t.table_name AS name,
       (SELECT reltuples::bigint FROM pg_class c
        JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE c.relname = t.table_name AND n.nspname = t.table_schema) AS row_count
+       WHERE c.relname = t.table_name AND n.nspname = t.table_schema) AS row_count,
+      (SELECT tableowner FROM pg_tables pt
+       WHERE pt.schemaname = t.table_schema AND pt.tablename = t.table_name) AS owner
     FROM information_schema.tables t
     WHERE t.table_schema NOT IN ('pg_catalog', 'information_schema')
       AND t.table_type = 'BASE TABLE'

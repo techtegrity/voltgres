@@ -10,13 +10,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Key } from "lucide-react"
+import { Key, User } from "lucide-react"
 
 interface TableStructureViewProps {
   columns: ColumnRow[]
+  owner?: string
 }
 
-export function TableStructureView({ columns }: TableStructureViewProps) {
+export function TableStructureView({ columns, owner }: TableStructureViewProps) {
   if (columns.length === 0) {
     return (
       <div className="py-12 text-center text-muted-foreground">
@@ -26,7 +27,14 @@ export function TableStructureView({ columns }: TableStructureViewProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="space-y-3">
+      {owner && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <User className="w-3.5 h-3.5" />
+          Owner: <span className="font-mono text-foreground">{owner}</span>
+        </div>
+      )}
+      <div className="rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="border-border bg-muted/50">
@@ -76,6 +84,7 @@ export function TableStructureView({ columns }: TableStructureViewProps) {
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }
