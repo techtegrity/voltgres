@@ -8,6 +8,13 @@
       "when": 1773183307752,
       "tag": "0000_plain_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1773365356761,
+      "tag": "0001_outgoing_the_fury",
+      "breakpoints": true
     }
   ]
 }
