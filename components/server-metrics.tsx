@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { useSystemMetrics, type MetricsSnapshot } from "@/hooks/use-system-metrics"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Cpu, HardDrive, MemoryStick, Clock } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Cpu, HardDrive, MemoryStick, Info } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -20,6 +20,7 @@ import {
 import { DiskUsageDialog } from "@/components/disk-usage-dialog"
 import { CpuUsageDialog } from "@/components/cpu-usage-dialog"
 import { MemoryUsageDialog } from "@/components/memory-usage-dialog"
+import { ServerInfoDialog } from "@/components/server-info-dialog"
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B"
@@ -27,15 +28,6 @@ function formatBytes(bytes: number) {
   const sizes = ["B", "KB", "MB", "GB", "TB"]
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
-}
-
-function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
 }
 
 function GaugeRing({
@@ -112,14 +104,12 @@ export function ServerMetrics() {
   const [diskDialogOpen, setDiskDialogOpen] = useState(false)
   const [cpuDialogOpen, setCpuDialogOpen] = useState(false)
   const [memDialogOpen, setMemDialogOpen] = useState(false)
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false)
 
   if (loading || !metrics) {
     return (
       <Card className="bg-card border-border">
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-base">Server</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
+        <CardContent className="px-4 py-3">
           <div className="h-[80px] flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
           </div>
@@ -131,21 +121,7 @@ export function ServerMetrics() {
   return (
     <>
       <Card className="bg-card border-border">
-        <CardHeader className="pb-0 pt-3 px-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Server</CardTitle>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="truncate max-w-[200px] hidden sm:inline" title={metrics.cpu.model}>
-                {metrics.cpu.model}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                up {formatUptime(metrics.uptime)}
-              </span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-3 pt-2">
+        <CardContent className="px-4 py-3">
           <div className="flex items-stretch gap-4">
             {/* Gauges column — compact row */}
             <div className="flex items-center gap-4 shrink-0">
@@ -248,6 +224,16 @@ export function ServerMetrics() {
                 </ChartContainer>
               </div>
             )}
+
+            {/* Info button */}
+            <button
+              type="button"
+              onClick={() => setInfoDialogOpen(true)}
+              className="self-start shrink-0 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              title="Server information"
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -255,6 +241,7 @@ export function ServerMetrics() {
       <CpuUsageDialog open={cpuDialogOpen} onOpenChange={setCpuDialogOpen} />
       <MemoryUsageDialog open={memDialogOpen} onOpenChange={setMemDialogOpen} />
       <DiskUsageDialog open={diskDialogOpen} onOpenChange={setDiskDialogOpen} />
+      <ServerInfoDialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen} metrics={metrics} />
     </>
   )
 }
