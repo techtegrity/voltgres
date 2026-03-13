@@ -10,16 +10,30 @@ DOCKER_SOCK="/var/run/docker.sock"
 if [ -S "$DOCKER_SOCK" ]; then
   SOCK_GID=$(stat -c %g "$DOCKER_SOCK" 2>/dev/null || echo "")
   if [ -n "$SOCK_GID" ] && [ "$SOCK_GID" != "0" ]; then
-    # Create a group with the socket's GID and add nextjs to it
+    # Socket is owned by a non-root group (typical: docker group)
+    # Create a group with that GID if it doesn't exist, then add nextjs
     if ! getent group "$SOCK_GID" >/dev/null 2>&1; then
-      addgroup --gid "$SOCK_GID" dockersock 2>/dev/null || true
+      addgroup -g "$SOCK_GID" dockersock 2>/dev/null || true
     fi
     SOCK_GROUP=$(getent group "$SOCK_GID" | cut -d: -f1)
-    addgroup nextjs "$SOCK_GROUP" 2>/dev/null || true
-    echo "Docker socket accessible (GID $SOCK_GID)"
+    if [ -n "$SOCK_GROUP" ]; then
+      addgroup nextjs "$SOCK_GROUP" 2>/dev/null || true
+    fi
+    echo "Docker socket: granted nextjs access via group $SOCK_GROUP (GID $SOCK_GID)"
+  elif [ "$SOCK_GID" = "0" ]; then
+    # Socket is owned by root:root — make it group-readable for nextjs
+    chmod 666 "$DOCKER_SOCK" 2>/dev/null || true
+    echo "Docker socket: set world-readable (was root:root)"
+  fi
+
+  # Verify access actually works
+  if su-exec nextjs docker info >/dev/null 2>&1; then
+    echo "Docker socket: verified OK"
+  else
+    echo "Docker socket: WARNING — nextjs still cannot access docker"
   fi
 else
-  echo "Docker socket not found — Docker disk management disabled"
+  echo "Docker socket: not mounted — Docker disk management disabled"
 fi
 
 # ── Database migrations ───────────────────────────────────────────
