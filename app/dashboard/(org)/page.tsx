@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useDatabases } from "@/hooks/use-databases"
 import { usePgUsers } from "@/hooks/use-pg-users"
@@ -37,6 +37,13 @@ import { ConnectionModal } from "@/components/connection-modal"
 import { DeleteDatabaseDialog } from "@/components/delete-database-dialog"
 import { ServerMetrics } from "@/components/server-metrics"
 import { generatePassword } from "@/lib/generate-password"
+import { api } from "@/lib/api-client"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Database,
   Plus,
@@ -52,6 +59,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react"
 
 function formatBytes(bytes: number) {
@@ -83,6 +91,28 @@ export default function DatabasesPage() {
   const [copiedPassword, setCopiedPassword] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+
+  // Ownership issue tracking
+  const [ownershipIssues, setOwnershipIssues] = useState<Record<string, number>>({})
+  useEffect(() => {
+    if (databases.length === 0) return
+    const checkAll = async () => {
+      const results = await Promise.allSettled(
+        databases.map(async (db) => {
+          const res = await api.databases.checkOwnership(db.name)
+          return { name: db.name, count: res.misconfiguredCount }
+        })
+      )
+      const issues: Record<string, number> = {}
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.count > 0) {
+          issues[r.value.name] = r.value.count
+        }
+      }
+      setOwnershipIssues(issues)
+    }
+    checkAll()
+  }, [databases])
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<string>("name")
@@ -479,8 +509,20 @@ export default function DatabasesPage() {
                           <Database className="w-4 h-4 text-primary" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-medium text-foreground font-mono">
+                          <span className="font-medium text-foreground font-mono flex items-center gap-1.5">
                             {db.name}
+                            {ownershipIssues[db.name] && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{ownershipIssues[db.name]} table{ownershipIssues[db.name] > 1 ? "s" : ""} owned by postgres — fix in Settings</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {db.owner}
