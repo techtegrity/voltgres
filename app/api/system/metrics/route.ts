@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "@/lib/auth-server"
 import os from "node:os"
 import { execSync } from "node:child_process"
 
@@ -59,6 +60,9 @@ function getDiskUsage(): {
 }
 
 export async function GET() {
+  const session = await getServerSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const totalMem = os.totalmem()
   const freeMem = os.freemem()
   const usedMem = totalMem - freeMem

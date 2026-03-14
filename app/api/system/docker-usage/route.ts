@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "@/lib/auth-server"
 import { execFileSync, execSync } from "node:child_process"
 import { existsSync } from "node:fs"
 
@@ -24,6 +25,9 @@ export interface DockerUsageData {
  * Gracefully returns { available: false } if Docker socket is not accessible.
  */
 export async function GET() {
+  const session = await getServerSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   // Step 1: Check if docker socket exists
   if (!existsSync("/var/run/docker.sock")) {
     console.log("[docker-usage] Socket /var/run/docker.sock does not exist")

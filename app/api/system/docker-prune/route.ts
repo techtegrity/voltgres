@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "@/lib/auth-server"
 import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
 
@@ -33,6 +34,9 @@ function findDocker(): string | null {
  * Returns the amount of space reclaimed.
  */
 export async function POST(request: Request) {
+  const session = await getServerSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   let body: { target?: string }
   try {
     body = await request.json()

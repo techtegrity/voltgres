@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "@/lib/auth-server"
 import { execSync } from "node:child_process"
 
 export const dynamic = "force-dynamic"
@@ -15,6 +16,9 @@ interface DiskEntry {
  * Uses `du -sx` to stay on one filesystem and avoid crossing mounts.
  */
 export async function GET() {
+  const session = await getServerSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     // Get total disk size from df
     const dfOut = execSync("df -k /", { encoding: "utf-8" })

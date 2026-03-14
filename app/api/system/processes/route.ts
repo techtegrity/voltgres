@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "@/lib/auth-server"
 import { execSync } from "node:child_process"
 
 export const dynamic = "force-dynamic"
@@ -17,6 +18,9 @@ interface ProcessEntry {
  * Returns top processes by CPU and memory usage, plus memory breakdown.
  */
 export async function GET() {
+  const session = await getServerSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     // Top processes by CPU
     const cpuOut = execSync(
