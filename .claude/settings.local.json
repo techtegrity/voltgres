@@ -25,7 +25,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.config.* /Users/chris/Repos/mine/Techtegrity/voltgres/.env*)"
     ]
   }
 }

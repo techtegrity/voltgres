@@ -110,7 +110,7 @@ export default function AccessControlPage() {
               App access control is active. Make sure your current IP or token is in the allowlist to avoid being locked out of the dashboard.
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <span className="block mt-1 text-xs text-amber-600/70">
-                  Emergency bypass: set <code className="bg-amber-600/10 px-1 rounded">BYPASS_TOKEN</code> env var, then access with <code className="bg-amber-600/10 px-1 rounded">?bypass=your-token</code>
+                  Emergency bypass: set <code className="bg-amber-600/10 px-1 rounded">BYPASS_TOKEN</code> env var, then send header <code className="bg-amber-600/10 px-1 rounded">x-voltgres-bypass: your-token</code>
                 </span>
               )}
             </AlertDescription>

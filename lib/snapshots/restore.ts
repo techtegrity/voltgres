@@ -8,6 +8,7 @@ import { snapshot, connectionConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { downloadSnapshot } from "@/lib/storage/s3"
 import { regrantDatabaseSchemas } from "@/lib/pg/queries"
+import { decrypt } from "@/lib/crypto"
 
 function runPgRestore(args: string[], env: Record<string, string>): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,7 +91,7 @@ export async function executeRestore(
 
     const env: Record<string, string> = {}
     if (pgConfig.password) {
-      env.PGPASSWORD = pgConfig.password
+      env.PGPASSWORD = decrypt(pgConfig.password)
     }
     if (pgConfig.sslMode === "disable") {
       env.PGSSLMODE = "disable"
@@ -109,7 +110,7 @@ export async function executeRestore(
         host: pgConfig.host,
         port: pgConfig.port,
         user: pgConfig.username,
-        password: pgConfig.password || undefined,
+        password: pgConfig.password ? decrypt(pgConfig.password) : undefined,
         max: 1,
         ssl: pgConfig.sslMode === "require" ? { rejectUnauthorized: false } : undefined,
       })

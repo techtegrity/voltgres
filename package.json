@@ -1,6 +1,6 @@
 {
   "name": "voltgres",
-  "version": "0.1.66",
+  "version": "0.1.67",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3042",
@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "docker:fresh": "docker compose down -v && docker compose up -d --build"
+    "docker:fresh": "docker compose down -v && docker compose up -d --build",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1007.0",

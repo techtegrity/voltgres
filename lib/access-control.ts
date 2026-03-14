@@ -74,11 +74,11 @@ function ipToNum(ip: string): number | null {
 }
 
 export async function isAccessAllowed(request: NextRequest): Promise<boolean> {
-  // Bypass token (emergency override)
+  // Bypass token (emergency override) — checked via header to avoid leaking in logs/referrer
   const bypassToken = process.env.BYPASS_TOKEN
   if (bypassToken) {
-    const urlBypass = request.nextUrl.searchParams.get("bypass")
-    if (urlBypass === bypassToken) return true
+    const headerBypass = request.headers.get("x-voltgres-bypass")
+    if (headerBypass === bypassToken) return true
   }
 
   const rules = await getEnabledRules()

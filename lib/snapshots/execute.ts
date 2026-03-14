@@ -6,6 +6,7 @@ import { db } from "@/lib/db"
 import { snapshot, connectionConfig } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { uploadSnapshot } from "@/lib/storage/s3"
+import { decrypt } from "@/lib/crypto"
 
 function runPgDump(args: string[], env: Record<string, string>, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -66,7 +67,7 @@ export async function executeSnapshot(snapshotId: string): Promise<void> {
 
     const env: Record<string, string> = {}
     if (pgConfig.password) {
-      env.PGPASSWORD = pgConfig.password
+      env.PGPASSWORD = decrypt(pgConfig.password)
     }
     if (pgConfig.sslMode === "disable") {
       env.PGSSLMODE = "disable"
