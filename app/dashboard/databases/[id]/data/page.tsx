@@ -52,10 +52,11 @@ import {
   Settings,
   MoreVertical,
   Import,
+  Bomb,
 } from "lucide-react"
 import Link from "next/link"
 
-export default function DatabaseBackupsPage({
+export default function DatabaseDataPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -73,6 +74,9 @@ export default function DatabaseBackupsPage({
   const [creating, setCreating] = useState(false)
   const [restoreDialogId, setRestoreDialogId] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState("")
+  const [resetting, setResetting] = useState(false)
 
   const storageConfigured = !storageLoading && storageConfig !== null
 
@@ -130,6 +134,17 @@ export default function DatabaseBackupsPage({
     await deleteSnapshot(snapshotId)
   }
 
+  const handleReset = async () => {
+    setResetting(true)
+    try {
+      await api.databases.reset(dbName)
+      setResetDialogOpen(false)
+      setResetConfirmText("")
+    } finally {
+      setResetting(false)
+    }
+  }
+
   const formatSchedule = (cron: string) => {
     if (cron === "0 * * * *") return "Hourly"
     if (cron === "0 2 * * *") return "Daily at 2:00 AM"
@@ -162,9 +177,9 @@ export default function DatabaseBackupsPage({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Backup & Restore</h1>
+          <h1 className="text-2xl font-bold text-foreground">Data</h1>
           <p className="text-muted-foreground mt-1">
-            Manage backups for {dbName}
+            Manage backups, imports, and data for {dbName}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -494,6 +509,66 @@ export default function DatabaseBackupsPage({
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Reset Database */}
+      <Card className="bg-card border-destructive/30 mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <Bomb className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Reset Database</CardTitle>
+                <CardDescription>
+                  Drop all schemas and recreate a clean public schema
+                </CardDescription>
+              </div>
+            </div>
+            <Dialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) setResetConfirmText("") }}>
+              <DialogTrigger asChild>
+                <Button variant="destructive" className="gap-2">
+                  <Bomb className="w-4 h-4" />
+                  Reset Database
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Reset Database</DialogTitle>
+                  <DialogDescription>
+                    This will permanently drop all schemas (including drizzle, public, and any others) and recreate an empty public schema. All tables, data, functions, and types will be destroyed.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Type <span className="font-mono font-bold text-destructive">{dbName}</span> to confirm:
+                  </p>
+                  <Input
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder={dbName}
+                    className="bg-input border-border font-mono"
+                  />
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button
+                    variant="destructive"
+                    disabled={resetConfirmText !== dbName || resetting}
+                    onClick={handleReset}
+                    className="gap-2"
+                  >
+                    {resetting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Reset Database
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
       </Card>
     </div>
   )

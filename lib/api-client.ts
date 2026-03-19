@@ -415,6 +415,10 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ pid }),
       }),
+    reset: (name: string) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/reset`, {
+        method: "POST",
+      }),
   },
 
   users: {
