@@ -6,6 +6,7 @@ import { useDatabases } from "@/hooks/use-databases"
 import { usePgUsers } from "@/hooks/use-pg-users"
 import { useConnection } from "@/hooks/use-connection"
 import { useKnownPasswords } from "@/hooks/use-known-passwords"
+import { useBackups } from "@/hooks/use-backups"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,6 +61,8 @@ import {
   ArrowDown,
   ArrowUpDown,
   AlertTriangle,
+  CloudOff,
+  Cloud,
 } from "lucide-react"
 
 function formatBytes(bytes: number) {
@@ -82,6 +85,21 @@ export default function DatabasesPage() {
   const { databases, loading, addDatabase, refresh } = useDatabases()
   const { users, addUser, refresh: refreshUsers } = usePgUsers()
   const { config } = useConnection()
+  const { backups: allBackupConfigs } = useBackups()
+
+  // Build a map: dbName -> has at least one enabled backup schedule
+  const backupStatus = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    for (const cfg of allBackupConfigs) {
+      if (cfg.enabled) {
+        for (const dbName of cfg.databases) {
+          map[dbName] = true
+        }
+      }
+    }
+    return map
+  }, [allBackupConfigs])
+
   const [newDbName, setNewDbName] = useState("")
   const [newDbOwner, setNewDbOwner] = useState("")
   const [newDbEncoding, setNewDbEncoding] = useState("UTF8")
@@ -471,6 +489,7 @@ export default function DatabasesPage() {
                     { key: "cache", label: "Cache Hit", className: "hidden lg:table-cell" },
                     { key: "reads", label: "Reads", className: "hidden xl:table-cell" },
                     { key: "writes", label: "Writes", className: "hidden xl:table-cell" },
+                    { key: "backups", label: "Backups", className: "hidden lg:table-cell" },
                   ].map((col) => (
                     <th
                       key={col.key}
@@ -572,6 +591,19 @@ export default function DatabasesPage() {
                       <span title={`Inserted: ${db.tup_inserted.toLocaleString()} / Updated: ${db.tup_updated.toLocaleString()} / Deleted: ${db.tup_deleted.toLocaleString()}`}>
                         {formatCompact(db.tup_inserted + db.tup_updated + db.tup_deleted)}
                       </span>
+                    </td>
+                    <td className="py-4 px-4 hidden lg:table-cell">
+                      {backupStatus[db.name] ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                          <Cloud className="w-3.5 h-3.5" />
+                          Enabled
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <CloudOff className="w-3.5 h-3.5" />
+                          None
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
