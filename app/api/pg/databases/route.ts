@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "@/lib/auth-server"
 import { getUserPool } from "@/lib/api/get-pg-pool"
-import { listDatabases, createDatabase, lockdownPublicConnect } from "@/lib/pg/queries"
+import { listDatabases, createDatabase } from "@/lib/pg/queries"
 
 export async function GET() {
   const session = await getServerSession()
@@ -11,10 +11,6 @@ export async function GET() {
   if (!pool) return NextResponse.json({ error: "No connection configured" }, { status: 400 })
 
   try {
-    // Ensure no database leaks CONNECT via the public role.
-    // Idempotent — safe to call on every request.
-    await lockdownPublicConnect(pool)
-
     const databases = await listDatabases(pool)
     return NextResponse.json(databases)
   } catch (error) {

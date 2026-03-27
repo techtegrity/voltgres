@@ -26,7 +26,12 @@
       "Bash(git commit:*)",
       "mcp__Claude_Preview__preview_start",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
-      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.config.* /Users/chris/Repos/mine/Techtegrity/voltgres/.env*)"
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.config.* /Users/chris/Repos/mine/Techtegrity/voltgres/.env*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls /Users/chris/Repos/mine/Techtegrity/voltgres/.env*)",
+      "mcp__451f10dd-f43d-456b-a1af-1289f30fac89__get_runtime_logs",
+      "mcp__451f10dd-f43d-456b-a1af-1289f30fac89__list_projects",
+      "Bash(npx drizzle-kit:*)"
     ]
   }
 }
