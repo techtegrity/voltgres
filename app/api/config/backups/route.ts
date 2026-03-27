@@ -27,8 +27,10 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    const { name, type, schedule, enabled, databases, destination } =
-      await request.json()
+    const {
+      name, type, schedule, enabled, databases, destination,
+      pruningEnabled, retentionKeepLast, retentionThinKeepEvery,
+    } = await request.json()
 
     if (!name || !schedule) {
       return NextResponse.json(
@@ -48,6 +50,9 @@ export async function POST(request: NextRequest) {
       enabled: enabled !== false,
       databases: JSON.stringify(databases || []),
       destination: destination || "",
+      pruningEnabled: pruningEnabled !== false,
+      retentionKeepLast: retentionKeepLast ?? 7,
+      retentionThinKeepEvery: retentionThinKeepEvery ?? 30,
       createdAt: now,
       updatedAt: now,
       userId: session.user.id,

@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { backupConfig, snapshot } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm"
 import { executeSnapshot } from "./execute"
+import { pruneSnapshots } from "./prune"
 
 const jobs = new Map<string, cron.ScheduledTask>()
 
@@ -98,9 +99,15 @@ function scheduleJob(config: typeof backupConfig.$inferSelect) {
         userId: config.userId,
       })
 
-      executeSnapshot(id).catch((err) => {
-        console.error(`[scheduler] Snapshot failed for ${database}:`, err)
-      })
+      executeSnapshot(id)
+        .then(() => {
+          if (config.pruningEnabled) {
+            return pruneSnapshots(config.id)
+          }
+        })
+        .catch((err) => {
+          console.error(`[scheduler] Snapshot failed for ${database}:`, err)
+        })
     }
 
     // Update lastRun

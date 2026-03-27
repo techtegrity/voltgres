@@ -37,6 +37,9 @@ export function useBackups(dbFilter?: string) {
       enabled?: boolean
       databases: string[]
       destination: string
+      pruningEnabled?: boolean
+      retentionKeepLast?: number
+      retentionThinKeepEvery?: number
     }) => {
       await api.backups.create(data)
       await refresh()

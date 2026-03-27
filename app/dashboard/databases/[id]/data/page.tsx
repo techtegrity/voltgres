@@ -53,6 +53,7 @@ import {
   MoreVertical,
   Import,
   Bomb,
+  Scissors,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -74,6 +75,13 @@ export default function DatabaseDataPage({
   const [creating, setCreating] = useState(false)
   const [restoreDialogId, setRestoreDialogId] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(false)
+  const [newPruningEnabled, setNewPruningEnabled] = useState(true)
+  const [newRetentionKeepLast, setNewRetentionKeepLast] = useState(7)
+  const [newRetentionThinKeepEvery, setNewRetentionThinKeepEvery] = useState(30)
+  const [editingBackupId, setEditingBackupId] = useState<string | null>(null)
+  const [editPruningEnabled, setEditPruningEnabled] = useState(true)
+  const [editRetentionKeepLast, setEditRetentionKeepLast] = useState(7)
+  const [editRetentionThinKeepEvery, setEditRetentionThinKeepEvery] = useState(30)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetConfirmText, setResetConfirmText] = useState("")
   const [resetting, setResetting] = useState(false)
@@ -87,6 +95,61 @@ export default function DatabaseDataPage({
     monthly: "0 2 1 * *",
   }
 
+  const retentionDefaults: Record<string, { keepLast: number; thinEvery: number }> = {
+    hourly: { keepLast: 24, thinEvery: 1 },
+    daily: { keepLast: 7, thinEvery: 30 },
+    weekly: { keepLast: 4, thinEvery: 84 },
+    monthly: { keepLast: 12, thinEvery: 365 },
+  }
+
+  const thinOptions: Record<string, { label: string; value: number }[]> = {
+    hourly: [
+      { label: "1 day", value: 1 },
+      { label: "2 days", value: 2 },
+      { label: "7 days", value: 7 },
+    ],
+    daily: [
+      { label: "7 days", value: 7 },
+      { label: "14 days", value: 14 },
+      { label: "30 days", value: 30 },
+      { label: "90 days", value: 90 },
+    ],
+    weekly: [
+      { label: "4 weeks", value: 28 },
+      { label: "8 weeks", value: 56 },
+      { label: "12 weeks", value: 84 },
+      { label: "26 weeks", value: 182 },
+    ],
+    monthly: [
+      { label: "3 months", value: 90 },
+      { label: "6 months", value: 182 },
+      { label: "12 months", value: 365 },
+    ],
+  }
+
+  const scheduleKeyFromCron = (cronExpr: string): string => {
+    for (const [key, val] of Object.entries(scheduleOptions)) {
+      if (val === cronExpr) return key
+    }
+    return "daily"
+  }
+
+  const handleFrequencyChange = (freq: string) => {
+    setNewBackupSchedule(freq)
+    const defaults = retentionDefaults[freq]
+    setNewRetentionKeepLast(defaults.keepLast)
+    setNewRetentionThinKeepEvery(defaults.thinEvery)
+  }
+
+  const formatThinEvery = (days: number): string => {
+    if (days === 1) return "1 day"
+    if (days < 7) return `${days} days`
+    if (days % 7 === 0 && days < 28) return `${days / 7} week${days / 7 > 1 ? "s" : ""}`
+    if (days < 60) return `${days} days`
+    if (days < 365) return `~${Math.round(days / 30)} months`
+    return `${Math.round(days / 365)} year${Math.round(days / 365) > 1 ? "s" : ""}`
+  }
+
   const handleCreateSchedule = () => {
     if (newBackupName) {
       addBackup({
@@ -96,10 +159,33 @@ export default function DatabaseDataPage({
         enabled: true,
         databases: [dbName],
         destination: "",
+        pruningEnabled: newPruningEnabled,
+        retentionKeepLast: newRetentionKeepLast,
+        retentionThinKeepEvery: newRetentionThinKeepEvery,
       })
       setNewBackupName("")
+      setNewPruningEnabled(true)
+      setNewRetentionKeepLast(retentionDefaults.daily.keepLast)
+      setNewRetentionThinKeepEvery(retentionDefaults.daily.thinEvery)
       setIsCreateOpen(false)
     }
+  }
+
+  const openEditRetention = (config: typeof backups[0]) => {
+    setEditingBackupId(config.id)
+    setEditPruningEnabled(config.pruningEnabled)
+    setEditRetentionKeepLast(config.retentionKeepLast)
+    setEditRetentionThinKeepEvery(config.retentionThinKeepEvery)
+  }
+
+  const handleSaveRetention = async () => {
+    if (!editingBackupId) return
+    await updateBackup(editingBackupId, {
+      pruningEnabled: editPruningEnabled,
+      retentionKeepLast: editRetentionKeepLast,
+      retentionThinKeepEvery: editRetentionThinKeepEvery,
+    })
+    setEditingBackupId(null)
   }
 
   const handleCreateSnapshot = async () => {
@@ -210,7 +296,7 @@ export default function DatabaseDataPage({
               </Field>
               <Field>
                 <FieldLabel htmlFor="backup-schedule">Frequency</FieldLabel>
-                <Select value={newBackupSchedule} onValueChange={setNewBackupSchedule}>
+                <Select value={newBackupSchedule} onValueChange={handleFrequencyChange}>
                   <SelectTrigger className="bg-input border-border">
                     <SelectValue />
                   </SelectTrigger>
@@ -223,6 +309,60 @@ export default function DatabaseDataPage({
                 </Select>
               </Field>
             </FieldGroup>
+
+            {/* Retention / Pruning */}
+            <div className="border border-border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Scissors className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Auto-prune old backups</span>
+                </div>
+                <Switch
+                  checked={newPruningEnabled}
+                  onCheckedChange={setNewPruningEnabled}
+                />
+              </div>
+              {newPruningEnabled && (
+                <div className="space-y-3 pl-6">
+                  <Field>
+                    <FieldLabel htmlFor="keep-last">Keep last</FieldLabel>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="keep-last"
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={newRetentionKeepLast}
+                        onChange={(e) => setNewRetentionKeepLast(parseInt(e.target.value) || 1)}
+                        className="bg-input border-border w-20"
+                      />
+                      <span className="text-sm text-muted-foreground">backups</span>
+                    </div>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="thin-every">Then keep 1 every</FieldLabel>
+                    <Select
+                      value={String(newRetentionThinKeepEvery)}
+                      onValueChange={(v) => setNewRetentionThinKeepEvery(parseInt(v))}
+                    >
+                      <SelectTrigger className="bg-input border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(thinOptions[newBackupSchedule] || thinOptions.daily).map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <p className="text-xs text-muted-foreground">
+                    Keeps {newRetentionKeepLast} most recent backups, then 1 per {formatThinEvery(newRetentionThinKeepEvery)}. Older excess backups are deleted automatically.
+                  </p>
+                </div>
+              )}
+            </div>
             {!storageConfigured && (
               <p className="text-sm text-amber-600 flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" />
@@ -324,6 +464,16 @@ export default function DatabaseDataPage({
                           <> &bull; Last run: {new Date(config.lastRun).toLocaleDateString()}</>
                         )}
                       </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {config.pruningEnabled ? (
+                          <span className="flex items-center gap-1">
+                            <Scissors className="w-3 h-3" />
+                            Keep {config.retentionKeepLast}, then 1/{formatThinEvery(config.retentionThinKeepEvery)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/60">Pruning off</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -349,6 +499,14 @@ export default function DatabaseDataPage({
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => openEditRetention(config)}
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="text-muted-foreground hover:text-destructive"
                       onClick={() => deleteBackup(config.id)}
                     >
@@ -367,6 +525,84 @@ export default function DatabaseDataPage({
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Retention Dialog */}
+      <Dialog
+        open={editingBackupId !== null}
+        onOpenChange={(open) => { if (!open) setEditingBackupId(null) }}
+      >
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Retention Policy</DialogTitle>
+            <DialogDescription>
+              Configure how old backups are pruned for this schedule
+            </DialogDescription>
+          </DialogHeader>
+          <div className="border border-border rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Scissors className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Auto-prune old backups</span>
+              </div>
+              <Switch
+                checked={editPruningEnabled}
+                onCheckedChange={setEditPruningEnabled}
+              />
+            </div>
+            {editPruningEnabled && (
+              <div className="space-y-3 pl-6">
+                <Field>
+                  <FieldLabel>Keep last</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={editRetentionKeepLast}
+                      onChange={(e) => setEditRetentionKeepLast(parseInt(e.target.value) || 1)}
+                      className="bg-input border-border w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">backups</span>
+                  </div>
+                </Field>
+                <Field>
+                  <FieldLabel>Then keep 1 every</FieldLabel>
+                  <Select
+                    value={String(editRetentionThinKeepEvery)}
+                    onValueChange={(v) => setEditRetentionThinKeepEvery(parseInt(v))}
+                  >
+                    <SelectTrigger className="bg-input border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(() => {
+                        const editingConfig = backups.find((b) => b.id === editingBackupId)
+                        const freq = editingConfig ? scheduleKeyFromCron(editingConfig.schedule) : "daily"
+                        return (thinOptions[freq] || thinOptions.daily).map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  Keeps {editRetentionKeepLast} most recent backups, then 1 per {formatThinEvery(editRetentionThinKeepEvery)}. Older excess backups are deleted automatically.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSaveRetention}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Snapshots */}
       <Card className="bg-card border-border">

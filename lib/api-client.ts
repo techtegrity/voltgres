@@ -124,6 +124,9 @@ export interface BackupConfigData {
   lastRun: string | null
   databases: string[]
   destination: string
+  pruningEnabled: boolean
+  retentionKeepLast: number
+  retentionThinKeepEvery: number
 }
 
 export interface ServerInfo {

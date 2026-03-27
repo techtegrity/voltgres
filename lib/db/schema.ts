@@ -91,6 +91,9 @@ export const backupConfig = sqliteTable("backup_config", {
   lastRun: integer("last_run", { mode: "timestamp" }),
   databases: text("databases").notNull(), // JSON array of database names
   destination: text("destination").notNull(),
+  pruningEnabled: integer("pruning_enabled", { mode: "boolean" }).notNull().default(true),
+  retentionKeepLast: integer("retention_keep_last").notNull().default(7),
+  retentionThinKeepEvery: integer("retention_thin_keep_every").notNull().default(30),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   userId: text("user_id")

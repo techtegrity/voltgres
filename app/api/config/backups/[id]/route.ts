@@ -25,6 +25,9 @@ export async function PUT(
       updates.databases = JSON.stringify(body.databases)
     if (body.destination !== undefined) updates.destination = body.destination
     if (body.lastRun !== undefined) updates.lastRun = new Date(body.lastRun)
+    if (body.pruningEnabled !== undefined) updates.pruningEnabled = body.pruningEnabled
+    if (body.retentionKeepLast !== undefined) updates.retentionKeepLast = body.retentionKeepLast
+    if (body.retentionThinKeepEvery !== undefined) updates.retentionThinKeepEvery = body.retentionThinKeepEvery
 
     await db
       .update(backupConfig)

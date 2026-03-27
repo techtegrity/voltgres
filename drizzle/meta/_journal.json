@@ -22,6 +22,13 @@
       "when": 1773414458450,
       "tag": "0002_tired_robbie_robertson",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1774578353767,
+      "tag": "0003_nebulous_ultimo",
+      "breakpoints": true
     }
   ]
 }
