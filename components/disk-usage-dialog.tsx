@@ -93,7 +93,7 @@ export function DiskUsageDialog({
     fetchAll()
   }, [open, fetchAll])
 
-  const handlePrune = async (target: "build-cache" | "images" | "all") => {
+  const handlePrune = async (target: "build-cache" | "all") => {
     setPruning(target)
     setPruneSuccess(null)
     try {
@@ -228,14 +228,14 @@ function DockerSection({
   docker: DockerUsageData
   pruning: string | null
   pruneSuccess: string | null
-  onPrune: (target: "build-cache" | "images" | "all") => void
+  onPrune: (target: "build-cache" | "all") => void
 }) {
   const hasError = !!docker.fetchError
   const rows: {
     label: string
     size: number
     reclaimable: number
-    target: "build-cache" | "images" | null
+    target: "build-cache" | "all" | null
     detail: string
   }[] = [
     {
@@ -251,9 +251,9 @@ function DockerSection({
       label: "Images",
       size: docker.images.size,
       reclaimable: docker.images.reclaimable,
-      target: "images",
+      target: null,
       detail: hasError
-        ? "Size unknown — prune unused images"
+        ? "Size unknown"
         : `${docker.images.total} total, ${docker.images.active} in use`,
     },
     {

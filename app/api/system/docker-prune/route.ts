@@ -5,16 +5,12 @@ import { existsSync } from "node:fs"
 
 export const dynamic = "force-dynamic"
 
-type PruneTarget = "build-cache" | "images" | "all"
+type PruneTarget = "build-cache" | "all"
 
 const COMMANDS: Record<PruneTarget, { args: string[]; label: string }> = {
   "build-cache": {
     args: ["builder", "prune", "-a", "-f"],
     label: "build cache",
-  },
-  images: {
-    args: ["image", "prune", "-a", "-f"],
-    label: "unused images",
   },
   all: {
     args: ["system", "prune", "-a", "-f"],

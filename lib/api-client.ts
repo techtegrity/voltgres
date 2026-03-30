@@ -607,7 +607,7 @@ export const api = {
     metrics: () => apiFetch<SystemMetrics>("/api/system/metrics"),
     diskUsage: () => apiFetch<DiskUsageData>("/api/system/disk-usage"),
     dockerUsage: () => apiFetch<DockerUsageData>("/api/system/docker-usage"),
-    dockerPrune: (target: "build-cache" | "images" | "all") =>
+    dockerPrune: (target: "build-cache" | "all") =>
       apiFetch<DockerPruneResult>("/api/system/docker-prune", {
         method: "POST",
         body: JSON.stringify({ target }),
