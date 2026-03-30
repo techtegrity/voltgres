@@ -70,7 +70,7 @@ services:
     environment:
       - DOMAIN=${DOMAIN:-}
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-voltgres}@postgres:5432
-      - AUTH_TYPE=scram-sha-256
+      - AUTH_TYPE=plain
       - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$1
       - POOL_MODE=transaction
       - DEFAULT_POOL_SIZE=20
