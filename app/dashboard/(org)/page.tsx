@@ -112,12 +112,18 @@ export default function DatabasesPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
-  // Connection peaks (24h)
+  // Connection peaks (24h) + server max_connections
   const [connectionPeaks, setConnectionPeaks] = useState<Record<string, { peak: number; peakActive: number }>>({})
+  const [maxConnections, setMaxConnections] = useState<number | null>(null)
   useEffect(() => {
     fetch("/api/pg/connection-peaks")
-      .then((r) => r.ok ? r.json() : {})
-      .then(setConnectionPeaks)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setConnectionPeaks(data.databases ?? {})
+          setMaxConnections(data.maxConnections ?? null)
+        }
+      })
       .catch(() => {})
   }, [databases])
 
@@ -600,6 +606,9 @@ export default function DatabasesPage() {
                                 </>
                               ) : (
                                 <p>No peak data yet</p>
+                              )}
+                              {maxConnections !== null && (
+                                <p className="border-t border-border/50 pt-0.5 mt-0.5">Server max_connections: {maxConnections}</p>
                               )}
                             </div>
                           </TooltipContent>

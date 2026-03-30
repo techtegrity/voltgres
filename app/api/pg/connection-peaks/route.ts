@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "@/lib/auth-server"
+import { getUserPool } from "@/lib/api/get-pg-pool"
+import { getServerInfo } from "@/lib/pg/queries"
 import { db } from "@/lib/db"
 import { connectionSnapshot } from "@/lib/db/schema"
 import { gte, sql } from "drizzle-orm"
 
 /**
- * Returns peak (max) connection counts per database over the last 24 hours.
- * { [database]: { peak: number, peakActive: number, peakAt: string } }
+ * Returns peak (max) connection counts per database over the last 24 hours,
+ * plus the server's max_connections setting.
  */
 export async function GET(_req: NextRequest) {
   const session = await getServerSession()
@@ -24,10 +26,21 @@ export async function GET(_req: NextRequest) {
     .where(gte(connectionSnapshot.sampledAt, since))
     .groupBy(connectionSnapshot.database)
 
-  const result: Record<string, { peak: number; peakActive: number }> = {}
+  const databases: Record<string, { peak: number; peakActive: number }> = {}
   for (const row of rows) {
-    result[row.database] = { peak: row.peak, peakActive: row.peakActive }
+    databases[row.database] = { peak: row.peak, peakActive: row.peakActive }
   }
 
-  return NextResponse.json(result)
+  let maxConnections: number | null = null
+  try {
+    const pool = await getUserPool(session.user.id)
+    if (pool) {
+      const info = await getServerInfo(pool)
+      maxConnections = info.maxConnections
+    }
+  } catch {
+    // non-critical
+  }
+
+  return NextResponse.json({ databases, maxConnections })
 }
