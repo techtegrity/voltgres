@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   try {
     execFileSync(dockerBin, ["info"], {
       encoding: "utf-8",
-      timeout: 5000,
+      timeout: 15000,
       stdio: ["pipe", "pipe", "pipe"],
     })
   } catch {

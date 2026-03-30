@@ -264,6 +264,7 @@ export interface DockerTypeUsage {
 
 export interface DockerUsageData {
   available: boolean
+  fetchError?: string
   buildCache: DockerTypeUsage
   images: DockerTypeUsage
   containers: DockerTypeUsage

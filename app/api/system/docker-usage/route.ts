@@ -51,7 +51,7 @@ export async function GET() {
   try {
     execFileSync(dockerBin, ["info"], {
       encoding: "utf-8",
-      timeout: 5000,
+      timeout: 15000,
       stdio: ["pipe", "pipe", "pipe"],
     })
   } catch (err) {
@@ -68,7 +68,7 @@ export async function GET() {
       ["system", "df", "--format", "{{json .}}"],
       {
         encoding: "utf-8",
-        timeout: 10000,
+        timeout: 30000,
       }
     )
 
@@ -109,10 +109,15 @@ export async function GET() {
   } catch (err) {
     const msg = (err as Error).message || "unknown"
     console.log("[docker-usage] docker system df failed:", msg)
-    return NextResponse.json(
-      { error: msg },
-      { status: 500 }
-    )
+    // Return available: true with unknown sizes so the UI can still offer prune buttons
+    return NextResponse.json({
+      available: true,
+      fetchError: msg,
+      buildCache: { total: 0, active: 0, size: -1, reclaimable: -1 },
+      images: { total: 0, active: 0, size: -1, reclaimable: -1 },
+      containers: { total: 0, active: 0, size: 0, reclaimable: 0 },
+      volumes: { total: 0, active: 0, size: 0, reclaimable: 0 },
+    })
   }
 }
 

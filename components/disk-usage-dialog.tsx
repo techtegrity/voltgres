@@ -230,6 +230,7 @@ function DockerSection({
   pruneSuccess: string | null
   onPrune: (target: "build-cache" | "images" | "all") => void
 }) {
+  const hasError = !!docker.fetchError
   const rows: {
     label: string
     size: number
@@ -242,33 +243,44 @@ function DockerSection({
       size: docker.buildCache.size,
       reclaimable: docker.buildCache.reclaimable,
       target: "build-cache",
-      detail: `${docker.buildCache.total} entries, ${docker.buildCache.active} active`,
+      detail: hasError
+        ? "Size unknown — prune to free space"
+        : `${docker.buildCache.total} entries, ${docker.buildCache.active} active`,
     },
     {
       label: "Images",
       size: docker.images.size,
       reclaimable: docker.images.reclaimable,
       target: "images",
-      detail: `${docker.images.total} total, ${docker.images.active} in use`,
+      detail: hasError
+        ? "Size unknown — prune unused images"
+        : `${docker.images.total} total, ${docker.images.active} in use`,
     },
     {
       label: "Volumes",
       size: docker.volumes.size,
       reclaimable: 0,
       target: null,
-      detail: `${docker.volumes.total} total, ${docker.volumes.active} in use`,
+      detail: hasError
+        ? "Size unknown"
+        : `${docker.volumes.total} total, ${docker.volumes.active} in use`,
     },
   ]
 
-  // Only show if there's meaningful Docker usage
-  const totalSize = rows.reduce((s, r) => s + r.size, 0)
-  if (totalSize === 0) return null
+  // Show if there's meaningful Docker usage OR if we have an error (still allow pruning)
+  const totalSize = rows.reduce((s, r) => s + Math.max(r.size, 0), 0)
+  if (totalSize === 0 && !hasError) return null
 
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
         Docker Storage
       </p>
+      {hasError && (
+        <div className="text-xs text-amber-500 mb-1">
+          Could not read sizes (timed out) — you can still prune below
+        </div>
+      )}
       <div className="rounded-md border border-border divide-y divide-border">
         {rows.map((row) => (
           <div
@@ -280,10 +292,12 @@ function DockerSection({
               <div className="text-sm font-medium">{row.label}</div>
               <div className="text-xs text-muted-foreground">{row.detail}</div>
             </div>
-            <span className="text-sm font-mono tabular-nums shrink-0">
-              {formatBytes(row.size)}
-            </span>
-            {row.target && row.reclaimable > 0 && (
+            {row.size >= 0 && (
+              <span className="text-sm font-mono tabular-nums shrink-0">
+                {formatBytes(row.size)}
+              </span>
+            )}
+            {row.target && (row.reclaimable > 0 || hasError) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -303,8 +317,9 @@ function DockerSection({
                   </TooltipTrigger>
                   <TooltipContent side="left">
                     <p>
-                      Clean {row.label.toLowerCase()} — reclaim{" "}
-                      {formatBytes(row.reclaimable)}
+                      {row.reclaimable > 0
+                        ? `Clean ${row.label.toLowerCase()} — reclaim ${formatBytes(row.reclaimable)}`
+                        : `Clean ${row.label.toLowerCase()}`}
                     </p>
                   </TooltipContent>
                 </Tooltip>
