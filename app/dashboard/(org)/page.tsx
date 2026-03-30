@@ -112,6 +112,15 @@ export default function DatabasesPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
+  // Connection peaks (24h)
+  const [connectionPeaks, setConnectionPeaks] = useState<Record<string, { peak: number; peakActive: number }>>({})
+  useEffect(() => {
+    fetch("/api/pg/connection-peaks")
+      .then((r) => r.ok ? r.json() : {})
+      .then(setConnectionPeaks)
+      .catch(() => {})
+  }, [databases])
+
   // Ownership issue tracking
   const [ownershipIssues, setOwnershipIssues] = useState<Record<string, number>>({})
   useEffect(() => {
@@ -566,17 +575,53 @@ export default function DatabasesPage() {
                       {formatBytes(db.size_bytes)}
                     </td>
                     <td className="py-4 px-4 hidden sm:table-cell">
-                      <span className={`inline-flex items-center gap-1.5 text-sm ${db.active_connections > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-                        {db.active_connections > 0 && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        )}
-                        {db.active_connections}
-                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`inline-flex items-center gap-1.5 text-sm ${db.active_connections > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                              {db.active_connections > 0 && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                              )}
+                              {db.active_connections}
+                              {connectionPeaks[db.name] && connectionPeaks[db.name].peak > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  / {connectionPeaks[db.name].peak}
+                                </span>
+                              )}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs space-y-0.5">
+                              <p>Current: {db.active_connections} connection{db.active_connections !== 1 ? "s" : ""}</p>
+                              {connectionPeaks[db.name] ? (
+                                <>
+                                  <p>24h peak total: {connectionPeaks[db.name].peak}</p>
+                                  <p>24h peak active: {connectionPeaks[db.name].peakActive}</p>
+                                </>
+                              ) : (
+                                <p>No peak data yet</p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground hidden lg:table-cell">
-                      <span title={`${db.xact_commit.toLocaleString()} commits / ${db.xact_rollback.toLocaleString()} rollbacks`}>
-                        {formatCompact(db.xact_commit + db.xact_rollback)}
-                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              {(db.xact_commit + db.xact_rollback).toLocaleString()}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs space-y-0.5">
+                              <p>Commits: {db.xact_commit.toLocaleString()}</p>
+                              <p>Rollbacks: {db.xact_rollback.toLocaleString()}</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </td>
                     <td className="py-4 px-4 hidden lg:table-cell">
                       <div className="flex items-center gap-2">
