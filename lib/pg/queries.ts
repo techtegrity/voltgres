@@ -152,20 +152,23 @@ export async function listPgUsers(pool: Pool) {
   return result.rows
 }
 
+export const DEFAULT_CONNECTION_LIMIT = 20
+
 export async function createPgUser(
   pool: Pool,
   username: string,
   password: string,
-  options: { superuser?: boolean; canLogin?: boolean } = {}
+  options: { superuser?: boolean; canLogin?: boolean; connectionLimit?: number } = {}
 ) {
   const safeUsername = username.replace(/[^a-zA-Z0-9_]/g, "_")
-  const { superuser = false, canLogin = true } = options
+  const { superuser = false, canLogin = true, connectionLimit = DEFAULT_CONNECTION_LIMIT } = options
 
   let sql = `CREATE ROLE "${safeUsername}"`
   const attrs: string[] = []
   if (canLogin) attrs.push("LOGIN")
   if (superuser) attrs.push("SUPERUSER")
   attrs.push(`PASSWORD ${escapeLiteral(password)}`)
+  if (connectionLimit >= 0) attrs.push(`CONNECTION LIMIT ${connectionLimit}`)
 
   if (attrs.length > 0) {
     sql += ` ${attrs.join(" ")}`
