@@ -57,16 +57,22 @@ function buildConnectionString(params: {
   user: string
   password: string
   ssl: boolean
+  pgBouncer: boolean
   format: ConnectionFormat
   encodePassword?: boolean
 }): string {
-  const { host, port, db, user, password, ssl, format, encodePassword = true } = params
+  const { host, port, db, user, password, ssl, pgBouncer, format, encodePassword = true } = params
   const uriPassword = encodePassword ? encodeURIComponent(password) : password
-  const sslParam = ssl ? "?sslmode=require" : ""
+
+  // Build query parameters for URI formats
+  const queryParams: string[] = []
+  if (ssl) queryParams.push("sslmode=require")
+  if (ssl && pgBouncer) queryParams.push("uselibpqcompat=true")
+  const queryString = queryParams.length > 0 ? `?${queryParams.join("&")}` : ""
 
   switch (format) {
     case "uri":
-      return `postgresql://${user}:${uriPassword}@${host}:${port}/${db}${sslParam}`
+      return `postgresql://${user}:${uriPassword}@${host}:${port}/${db}${queryString}`
     case "parameters":
       return [
         `host=${host}`,
@@ -79,7 +85,7 @@ function buildConnectionString(params: {
         .filter(Boolean)
         .join(" ")
     case "env":
-      return `DATABASE_URL="postgresql://${user}:${uriPassword}@${host}:${port}/${db}${sslParam}"`
+      return `DATABASE_URL="postgresql://${user}:${uriPassword}@${host}:${port}/${db}${queryString}"`
     case "psql":
       return `psql "host=${host} port=${port} dbname=${db} user=${user}${ssl ? " sslmode=require" : ""}"`
   }
@@ -241,10 +247,11 @@ export function ConnectionModal({
       user: selectedUser,
       password: displayPassword,
       ssl: sslEnabled,
+      pgBouncer: usePgBouncer,
       format,
       encodePassword: false,
     })
-  }, [selectedDb, selectedUser, publicHost, effectivePort, displayPassword, sslEnabled, format])
+  }, [selectedDb, selectedUser, publicHost, effectivePort, displayPassword, sslEnabled, usePgBouncer, format])
 
   // For clipboard: always use real password if known, encode only real passwords
   const clipboardString = useMemo(() => {
@@ -257,10 +264,11 @@ export function ConnectionModal({
       user: selectedUser,
       password: hasReal ? currentPassword : "[YOUR-PASSWORD]",
       ssl: sslEnabled,
+      pgBouncer: usePgBouncer,
       format,
       encodePassword: hasReal,
     })
-  }, [selectedDb, selectedUser, publicHost, effectivePort, currentPassword, sslEnabled, format])
+  }, [selectedDb, selectedUser, publicHost, effectivePort, currentPassword, sslEnabled, usePgBouncer, format])
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(clipboardString)
