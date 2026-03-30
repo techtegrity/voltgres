@@ -1111,6 +1111,28 @@ export async function transferTableOwnership(
   await pool.query(`ALTER TABLE "${safeSchema}"."${safeTable}" OWNER TO "${safeOwner}"`)
 }
 
+export interface RoleConnectionInfo {
+  rolename: string
+  connection_limit: number
+  active_connections: number
+}
+
+export async function getConnectionsByRole(pool: Pool): Promise<RoleConnectionInfo[]> {
+  const result = await pool.query(`
+    SELECT
+      r.rolname AS rolename,
+      r.rolconnlimit AS connection_limit,
+      COALESCE(count(a.pid), 0)::int AS active_connections
+    FROM pg_roles r
+    LEFT JOIN pg_stat_activity a ON a.usename = r.rolname
+    WHERE r.rolcanlogin = true
+      AND r.rolname NOT LIKE 'pg_%'
+    GROUP BY r.rolname, r.rolconnlimit
+    ORDER BY active_connections DESC
+  `)
+  return result.rows
+}
+
 export async function getServerInfo(pool: Pool) {
   const versionResult = await pool.query("SELECT version()")
   const uptimeResult = await pool.query(

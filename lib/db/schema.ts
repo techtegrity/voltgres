@@ -161,6 +161,25 @@ export const queryLogConfig = sqliteTable("query_log_config", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 })
 
+export const alert = sqliteTable("alert", {
+  id: text("id").primaryKey(),
+  type: text("type", {
+    enum: [
+      "connection_limit_warning",
+      "connection_limit_critical",
+      "server_connections_warning",
+      "server_connections_critical",
+    ],
+  }).notNull(),
+  roleName: text("role_name"),
+  message: text("message").notNull(),
+  currentValue: integer("current_value").notNull(),
+  threshold: integer("threshold").notNull(),
+  resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
+  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+})
+
 export const snapshot = sqliteTable("snapshot", {
   id: text("id").primaryKey(),
   database: text("database").notNull(),

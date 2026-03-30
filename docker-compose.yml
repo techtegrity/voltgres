@@ -55,6 +55,25 @@ services:
     networks:
       - voltgres-net
 
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    container_name: voltgres-pgbouncer
+    restart: unless-stopped
+    entrypoint: ["/entrypoint.sh"]
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/entrypoint.sh:/entrypoint.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - voltgres-net
+
   caddy:
     image: caddy:2-alpine
     container_name: voltgres-caddy

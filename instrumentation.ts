@@ -22,5 +22,8 @@ export async function register() {
 
     const { initDockerCleanup } = await import("@/lib/docker-cleanup")
     initDockerCleanup()
+
+    const { initConnectionMonitor } = await import("@/lib/monitoring/connection-monitor")
+    initConnectionMonitor()
   }
 }

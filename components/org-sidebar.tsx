@@ -12,7 +12,9 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  Bell,
 } from "lucide-react"
+import { useAlerts } from "@/hooks/use-alerts"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 const navigation = [
@@ -26,6 +28,7 @@ export function OrgSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { data: session } = useSession()
+  const { alerts } = useAlerts()
 
   const handleSignOut = async () => {
     await signOut()
@@ -45,7 +48,20 @@ export function OrgSidebar() {
             <ChevronDown className="w-3 h-3 text-muted-foreground" />
           </div>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          {alerts.length > 0 && (
+            <Link
+              href="/dashboard"
+              className="relative flex items-center justify-center w-8 h-8 rounded-md hover:bg-sidebar-accent transition-colors"
+            >
+              <Bell className="w-4 h-4 text-yellow-500" />
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                {alerts.length}
+              </span>
+            </Link>
+          )}
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Section Label */}

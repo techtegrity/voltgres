@@ -37,6 +37,7 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { ConnectionModal } from "@/components/connection-modal"
 import { DeleteDatabaseDialog } from "@/components/delete-database-dialog"
 import { ServerMetrics } from "@/components/server-metrics"
+import { AlertsBanner } from "@/components/alerts-banner"
 import { generatePassword } from "@/lib/generate-password"
 import { api } from "@/lib/api-client"
 import {
@@ -462,6 +463,9 @@ export default function DatabasesPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
         onDeleted={() => { setDeleteTarget(null); refresh() }}
       />
+
+      {/* Alerts */}
+      <AlertsBanner />
 
       {/* Server Metrics */}
       <div className="mb-6">
