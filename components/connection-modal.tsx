@@ -107,6 +107,8 @@ export function ConnectionModal({
   const [copied, setCopied] = useState(false)
   const [publicHost, setPublicHost] = useState("")
   const [publicPort, setPublicPort] = useState(5432)
+  const [pgBouncerPort, setPgBouncerPort] = useState(6432)
+  const [usePgBouncer, setUsePgBouncer] = useState(true)
   const [tempPassword, setTempPassword] = useState<string | null>(null)
   const [isResetting, setIsResetting] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
@@ -124,6 +126,7 @@ export function ConnectionModal({
       .then((info) => {
         setPublicHost(info.publicHost || window.location.hostname)
         setPublicPort(info.publicPort)
+        if (info.pgBouncerPort) setPgBouncerPort(info.pgBouncerPort)
       })
       .catch(() => {
         setPublicHost(window.location.hostname)
@@ -227,11 +230,13 @@ export function ConnectionModal({
       : "****************"
     : "[YOUR-PASSWORD]"
 
+  const effectivePort = usePgBouncer ? pgBouncerPort : publicPort
+
   const connectionString = useMemo(() => {
     if (!selectedDb || !selectedUser || !publicHost) return ""
     return buildConnectionString({
       host: publicHost,
-      port: publicPort,
+      port: effectivePort,
       db: selectedDb,
       user: selectedUser,
       password: displayPassword,
@@ -239,7 +244,7 @@ export function ConnectionModal({
       format,
       encodePassword: false,
     })
-  }, [selectedDb, selectedUser, publicHost, publicPort, displayPassword, sslEnabled, format])
+  }, [selectedDb, selectedUser, publicHost, effectivePort, displayPassword, sslEnabled, format])
 
   // For clipboard: always use real password if known, encode only real passwords
   const clipboardString = useMemo(() => {
@@ -247,7 +252,7 @@ export function ConnectionModal({
     const hasReal = currentPassword !== null
     return buildConnectionString({
       host: publicHost,
-      port: publicPort,
+      port: effectivePort,
       db: selectedDb,
       user: selectedUser,
       password: hasReal ? currentPassword : "[YOUR-PASSWORD]",
@@ -255,7 +260,7 @@ export function ConnectionModal({
       format,
       encodePassword: hasReal,
     })
-  }, [selectedDb, selectedUser, publicHost, publicPort, currentPassword, sslEnabled, format])
+  }, [selectedDb, selectedUser, publicHost, effectivePort, currentPassword, sslEnabled, format])
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(clipboardString)
@@ -300,7 +305,7 @@ export function ConnectionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
           {/* Database selector */}
           <Field>
             <FieldLabel className="gap-1.5">
@@ -382,27 +387,26 @@ export function ConnectionModal({
           </Field>
         </div>
 
-        {/* Format + SSL row */}
-        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-          <Field className="flex-1">
-            <FieldLabel>Connection string</FieldLabel>
-            <Select
-              value={format}
-              onValueChange={(val) => setFormat(val as ConnectionFormat)}
+        {/* PgBouncer + SSL toggles */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={usePgBouncer}
+              onCheckedChange={setUsePgBouncer}
+              id="pgbouncer-toggle"
+            />
+            <label
+              htmlFor="pgbouncer-toggle"
+              className="text-sm cursor-pointer select-none"
             >
-              <SelectTrigger className="bg-input border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="uri">PostgreSQL URI</SelectItem>
-                <SelectItem value="parameters">Parameters</SelectItem>
-                <SelectItem value="env">.env</SelectItem>
-                <SelectItem value="psql">psql</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+              PgBouncer
+              {usePgBouncer && (
+                <span className="ml-1 text-xs text-muted-foreground">(Recommended)</span>
+              )}
+            </label>
+          </div>
 
-          <div className="flex items-center gap-2 pb-0.5">
+          <div className="flex items-center gap-2">
             <Switch
               checked={sslEnabled}
               onCheckedChange={setSslEnabled}
@@ -415,6 +419,27 @@ export function ConnectionModal({
               SSL
             </label>
           </div>
+        </div>
+
+        {/* Format buttons */}
+        <div className="flex gap-1">
+          {([
+            { value: "uri", label: "URI" },
+            { value: "parameters", label: "Parameters" },
+            { value: "env", label: ".env" },
+            { value: "psql", label: "psql" },
+          ] as const).map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              size="sm"
+              variant={format === opt.value ? "default" : "outline"}
+              className="text-xs h-7"
+              onClick={() => setFormat(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
         </div>
 
         {/* Connection string display */}

@@ -8,5 +8,6 @@ export async function GET() {
   return NextResponse.json({
     publicHost: process.env.DOMAIN || null,
     publicPort: parseInt(process.env.POSTGRES_PORT || "5432", 10),
+    pgBouncerPort: parseInt(process.env.PGBOUNCER_PORT || "6432", 10),
   })
 }

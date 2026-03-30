@@ -31,7 +31,11 @@
       "Bash(ls /Users/chris/Repos/mine/Techtegrity/voltgres/.env*)",
       "mcp__451f10dd-f43d-456b-a1af-1289f30fac89__get_runtime_logs",
       "mcp__451f10dd-f43d-456b-a1af-1289f30fac89__list_projects",
-      "Bash(npx drizzle-kit:*)"
+      "Bash(npx drizzle-kit:*)",
+      "Bash(grep -r \"max_connections\\\\|connection\\\\|pool\\\\|postgres\" /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.sh --include=*.md)",
+      "Bash(git push:*)",
+      "WebFetch(domain:hub.docker.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

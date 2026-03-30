@@ -140,6 +140,7 @@ export interface ServerInfo {
 export interface PublicConnectionInfo {
   publicHost: string | null
   publicPort: number
+  pgBouncerPort: number
 }
 
 export interface TableFilter {
