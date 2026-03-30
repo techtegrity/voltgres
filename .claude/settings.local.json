@@ -35,7 +35,18 @@
       "Bash(grep -r \"max_connections\\\\|connection\\\\|pool\\\\|postgres\" /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.sh --include=*.md)",
       "Bash(git push:*)",
       "WebFetch(domain:hub.docker.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(grep -r \"pgbouncer\\\\|bouncer\" /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.ini --include=*.conf --include=*.txt --include=*.sh --include=*.yml --include=*.yaml)",
+      "Bash(grep -r pgbouncer /Users/chris/Repos/mine/Techtegrity/voltgres --include=*.py --include=*.sh --include=*.ts --include=*.tsx --include=*.js)",
+      "Bash(chmod +x /Users/chris/Repos/mine/Techtegrity/voltgres/pgbouncer-entrypoint.sh)",
+      "Bash(docker compose:*)",
+      "Bash(open -a OrbStack)",
+      "Bash(docker info:*)",
+      "Bash(npx next:*)",
+      "Bash(docker run:*)",
+      "Bash(POSTGRES_PORT=5433 PGBOUNCER_PORT=6433 docker compose up -d postgres pgbouncer)",
+      "Bash(node migrate.mjs)",
+      "Bash(node -e \":*)"
     ]
   }
 }
