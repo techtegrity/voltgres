@@ -59,8 +59,13 @@ services:
     image: edoburu/pgbouncer:latest
     container_name: voltgres-pgbouncer
     restart: unless-stopped
+    user: root
+    entrypoint: ["/custom-entrypoint.sh"]
+    command: ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
     ports:
       - "${PGBOUNCER_PORT:-6432}:5432"
+    volumes:
+      - ./pgbouncer-entrypoint.sh:/custom-entrypoint.sh:ro
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-voltgres}@postgres:5432/postgres
       - AUTH_TYPE=md5
@@ -75,6 +80,9 @@ services:
       - QUERY_WAIT_TIMEOUT=120
       - ADMIN_USERS=${POSTGRES_USER:-postgres}
       - IGNORE_STARTUP_PARAMETERS=extra_float_digits,search_path
+      - CLIENT_TLS_SSLMODE=require
+      - CLIENT_TLS_KEY_FILE=/etc/pgbouncer/tls/client.key
+      - CLIENT_TLS_CERT_FILE=/etc/pgbouncer/tls/client.crt
     depends_on:
       postgres:
         condition: service_healthy
