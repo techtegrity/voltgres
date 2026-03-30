@@ -7,10 +7,24 @@ import { usePgUsers } from "@/hooks/use-pg-users"
 import { useConnection } from "@/hooks/use-connection"
 import { useKnownPasswords } from "@/hooks/use-known-passwords"
 import { useActivity } from "@/hooks/use-activity"
+import { useConnectionHistory } from "@/hooks/use-connection-history"
 import { api, type DatabaseRow } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ConnectionModal } from "@/components/connection-modal"
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import {
   Database,
   Link,
@@ -23,6 +37,21 @@ import {
   XCircle,
   Wifi,
 } from "lucide-react"
+
+const connectionChartConfig = {
+  total: {
+    label: "Total",
+    color: "hsl(217, 91%, 60%)",
+  },
+  active: {
+    label: "Active",
+    color: "hsl(142, 71%, 45%)",
+  },
+  idle: {
+    label: "Idle",
+    color: "hsl(38, 92%, 50%)",
+  },
+} satisfies ChartConfig
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B"
@@ -71,6 +100,7 @@ export default function DatabaseDashboardPage({
   const { config } = useConnection()
   const { passwords: knownPasswords, setPassword: setKnownPassword } = useKnownPasswords()
   const { connections, loading: activityLoading, refresh: refreshActivity, terminateConnection } = useActivity(dbName)
+  const { history: connectionHistory } = useConnectionHistory(dbName)
   const [connectionModalOpen, setConnectionModalOpen] = useState(false)
   const [terminatingPid, setTerminatingPid] = useState<number | null>(null)
   const [dbInfo, setDbInfo] = useState<DatabaseRow | null>(null)
@@ -207,6 +237,76 @@ export default function DatabaseDashboardPage({
               <span className="text-foreground font-medium">{dbInfo?.collation ?? "..."}</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Connections Over Time */}
+      <Card className="bg-card border-border mb-6">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Activity className="w-4 h-4 text-chart-4" />
+            Connections Over Time
+          </CardTitle>
+          <CardDescription>
+            Live connection count sampled every 10 seconds
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {connectionHistory.length < 2 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <Activity className="w-6 h-6 mx-auto mb-2 opacity-50 animate-pulse" />
+              <p className="text-sm">Collecting data&hellip; chart will appear shortly</p>
+            </div>
+          ) : (
+            <ChartContainer config={connectionChartConfig} className="h-[200px] w-full">
+              <AreaChart data={connectionHistory} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="fillActive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
+                <XAxis
+                  dataKey="time"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                  className="fill-muted-foreground"
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                  className="fill-muted-foreground"
+                  allowDecimals={false}
+                  width={30}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  stroke="hsl(217, 91%, 60%)"
+                  fill="url(#fillTotal)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="active"
+                  stroke="hsl(142, 71%, 45%)"
+                  fill="url(#fillActive)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </AreaChart>
+            </ChartContainer>
+          )}
         </CardContent>
       </Card>
 

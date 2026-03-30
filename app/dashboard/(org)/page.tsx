@@ -58,6 +58,7 @@ import {
   Users,
   CheckCircle2,
   Activity,
+  RefreshCw,
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
@@ -475,10 +476,18 @@ export default function DatabasesPage() {
       {/* Database List */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-lg">All Databases</CardTitle>
-          <CardDescription>
-            Click on a database to open its detail view with SQL editor
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">All Databases</CardTitle>
+              <CardDescription>
+                Click on a database to open its detail view with SQL editor
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={refresh}>
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
