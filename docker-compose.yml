@@ -69,7 +69,7 @@ services:
       - caddy-data:/caddy-data:ro
     environment:
       - DOMAIN=${DOMAIN:-}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-voltgres}@postgres:5432/postgres
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-voltgres}@postgres:5432
       - AUTH_TYPE=scram-sha-256
       - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$1
       - POOL_MODE=transaction
