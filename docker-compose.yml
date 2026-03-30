@@ -56,18 +56,25 @@ services:
       - voltgres-net
 
   pgbouncer:
-    image: bitnami/pgbouncer:latest
+    image: edoburu/pgbouncer:latest
     container_name: voltgres-pgbouncer
     restart: unless-stopped
-    entrypoint: ["/entrypoint.sh"]
     ports:
-      - "${PGBOUNCER_PORT:-6432}:6432"
+      - "${PGBOUNCER_PORT:-6432}:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
-    volumes:
-      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer/entrypoint.sh:/entrypoint.sh:ro
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-voltgres}@postgres:5432/postgres
+      - AUTH_TYPE=md5
+      - AUTH_QUERY=SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+      - POOL_MODE=transaction
+      - DEFAULT_POOL_SIZE=20
+      - MIN_POOL_SIZE=0
+      - RESERVE_POOL_SIZE=5
+      - MAX_CLIENT_CONN=200
+      - MAX_DB_CONNECTIONS=50
+      - SERVER_IDLE_TIMEOUT=300
+      - QUERY_WAIT_TIMEOUT=120
+      - ADMIN_USERS=${POSTGRES_USER:-postgres}
+      - IGNORE_STARTUP_PARAMETERS=extra_float_digits,search_path
     depends_on:
       postgres:
         condition: service_healthy
