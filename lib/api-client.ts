@@ -423,6 +423,10 @@ export const api = {
       apiFetch(`/api/pg/databases/${encodeURIComponent(name)}/reset`, {
         method: "POST",
       }),
+    connectionHistory: (name: string, range: "1h" | "1d" | "1w" = "1h") =>
+      apiFetch<{ time: string; total: number; active: number; idle: number }[]>(
+        `/api/pg/connection-history?database=${encodeURIComponent(name)}&range=${range}`
+      ),
   },
 
   users: {

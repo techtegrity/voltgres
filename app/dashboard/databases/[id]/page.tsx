@@ -7,7 +7,7 @@ import { usePgUsers } from "@/hooks/use-pg-users"
 import { useConnection } from "@/hooks/use-connection"
 import { useKnownPasswords } from "@/hooks/use-known-passwords"
 import { useActivity } from "@/hooks/use-activity"
-import { useConnectionHistory } from "@/hooks/use-connection-history"
+import { useConnectionHistory, type Range } from "@/hooks/use-connection-history"
 import { api, type DatabaseRow } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -100,7 +100,8 @@ export default function DatabaseDashboardPage({
   const { config } = useConnection()
   const { passwords: knownPasswords, setPassword: setKnownPassword } = useKnownPasswords()
   const { connections, loading: activityLoading, refresh: refreshActivity, terminateConnection } = useActivity(dbName)
-  const { history: connectionHistory } = useConnectionHistory(dbName)
+  const [connRange, setConnRange] = useState<Range>("1h")
+  const { history: connectionHistory, loading: historyLoading } = useConnectionHistory(dbName, connRange)
   const [connectionModalOpen, setConnectionModalOpen] = useState(false)
   const [terminatingPid, setTerminatingPid] = useState<number | null>(null)
   const [dbInfo, setDbInfo] = useState<DatabaseRow | null>(null)
@@ -243,19 +244,38 @@ export default function DatabaseDashboardPage({
       {/* Connections Over Time */}
       <Card className="bg-card border-border mb-6">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="w-4 h-4 text-chart-4" />
-            Connections Over Time
-          </CardTitle>
-          <CardDescription>
-            Live connection count sampled every 10 seconds
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="w-4 h-4 text-chart-4" />
+                Connections Over Time
+              </CardTitle>
+              <CardDescription>
+                Connection count sampled every minute
+              </CardDescription>
+            </div>
+            <div className="flex gap-1 rounded-lg border border-border p-0.5">
+              {(["1h", "1d", "1w"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setConnRange(r)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    connRange === r
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {connectionHistory.length < 2 ? (
+          {historyLoading || connectionHistory.length < 2 ? (
             <div className="py-8 text-center text-muted-foreground">
               <Activity className="w-6 h-6 mx-auto mb-2 opacity-50 animate-pulse" />
-              <p className="text-sm">Collecting data&hellip; chart will appear shortly</p>
+              <p className="text-sm">{historyLoading ? "Loading history\u2026" : "Waiting for data\u2026 snapshots are recorded every minute"}</p>
             </div>
           ) : (
             <ChartContainer config={connectionChartConfig} className="h-[200px] w-full">

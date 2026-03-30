@@ -1,7 +1,7 @@
 import cron from "node-cron"
 import { db } from "@/lib/db"
-import { alert, connectionConfig } from "@/lib/db/schema"
-import { eq, and } from "drizzle-orm"
+import { alert, connectionConfig, connectionSnapshot } from "@/lib/db/schema"
+import { eq, and, lt } from "drizzle-orm"
 import { getPool, type PgConnectionConfig } from "@/lib/pg/connection"
 import { getConnectionsByRole, getServerInfo } from "@/lib/pg/queries"
 import { decrypt } from "@/lib/crypto"
@@ -149,6 +149,37 @@ async function checkConnections() {
     } else {
       await resolveAlerts("server_connections_warning")
       await resolveAlerts("server_connections_critical")
+    }
+    // Record per-database connection snapshots
+    try {
+      const snapRows = await pool.query(`
+        SELECT
+          datname AS database,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE state = 'active')::int AS active,
+          COUNT(*) FILTER (WHERE state != 'active')::int AS idle
+        FROM pg_stat_activity
+        WHERE datname IS NOT NULL
+          AND backend_type = 'client backend'
+        GROUP BY datname
+      `)
+      const now = new Date()
+      for (const row of snapRows.rows) {
+        await db.insert(connectionSnapshot).values({
+          id: crypto.randomUUID(),
+          database: row.database,
+          total: row.total,
+          active: row.active,
+          idle: row.idle,
+          sampledAt: now,
+        })
+      }
+
+      // Cleanup: delete snapshots older than 8 days
+      const cutoff = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+      await db.delete(connectionSnapshot).where(lt(connectionSnapshot.sampledAt, cutoff))
+    } catch (snapError) {
+      console.error("[monitor] Snapshot recording failed:", (snapError as Error).message)
     }
   } catch (error) {
     console.error("[monitor] Connection check failed:", (error as Error).message)

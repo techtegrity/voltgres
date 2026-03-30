@@ -202,3 +202,12 @@ export const snapshot = sqliteTable("snapshot", {
     .notNull()
     .references(() => user.id),
 })
+
+export const connectionSnapshot = sqliteTable("connection_snapshot", {
+  id: text("id").primaryKey(),
+  database: text("database").notNull(),
+  total: integer("total").notNull(),
+  active: integer("active").notNull(),
+  idle: integer("idle").notNull(),
+  sampledAt: integer("sampled_at", { mode: "timestamp" }).notNull(),
+})
