@@ -1,0 +1,18 @@
+[DEFAULT]
+# Ban for 1 hour after failures
+bantime = 3600
+# Look at the last 10 minutes for failures
+findtime = 600
+# Allow 5 failures before banning
+maxretry = 5
+# Don't ban private/internal networks
+ignoreip = 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+[postgresql]
+enabled = true
+filter = postgresql
+action = docker-iptables[port="%(port)s"]
+logpath = /var/log/postgresql/postgresql.log
+# Override port — uses both default and custom port
+# This is set via FAIL2BAN_POSTGRES_PORTS env var in the entrypoint
+port = 5432

@@ -65,8 +65,8 @@ if [ "$STASHED" = true ]; then
     git stash pop || echo -e "${YELLOW}Warning: Could not restore stashed changes. Run 'git stash pop' manually.${NC}"
 fi
 
-# Ensure entrypoint script is executable
-chmod +x pg-entrypoint.sh
+# Ensure entrypoint scripts are executable
+chmod +x pg-entrypoint.sh pgbouncer-entrypoint.sh fail2ban-entrypoint.sh 2>/dev/null || true
 
 # Rebuild and restart
 echo "Rebuilding and restarting..."

@@ -97,6 +97,36 @@ start_cert_watcher() {
     ) &
 }
 
+# Enforce hostssl-only connections (reject unencrypted remote connections).
+# Runs on every startup so both new and existing installations are covered.
+enforce_hostssl() {
+    PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+    HBA="$PGDATA/pg_hba.conf"
+    if [ -f "$HBA" ]; then
+        # Replace 'host' with 'hostssl' for non-local connections
+        if grep -q '^host ' "$HBA"; then
+            sed -i 's/^host /hostssl /g' "$HBA"
+            echo "[pg-security] Enforced hostssl-only in pg_hba.conf (non-TLS connections rejected)"
+        fi
+    fi
+}
+
+# After initial DB setup, enforce hostssl.
+# docker-entrypoint.sh only creates pg_hba.conf on first init,
+# so we patch it on every start to ensure it stays enforced.
+start_hostssl_enforcer() {
+    (
+        # Wait for pg_hba.conf to exist (first init can take a few seconds)
+        for _ in $(seq 1 30); do
+            if [ -f "${PGDATA:-/var/lib/postgresql/data}/pg_hba.conf" ]; then
+                enforce_hostssl
+                return
+            fi
+            sleep 1
+        done
+    ) &
+}
+
 # --- Main ---
 
 # Try LE certs first, fall back to self-signed
@@ -105,9 +135,30 @@ copy_le_certs || generate_self_signed
 # Start background watcher for cert updates
 start_cert_watcher
 
-# Start PostgreSQL with SSL and pg_stat_statements enabled
+# Enforce hostssl on existing installations
+enforce_hostssl
+
+# Start hostssl enforcer for first-time init (when pg_hba.conf doesn't exist yet)
+start_hostssl_enforcer
+
+# Determine log directory
+LOG_DIR="/var/log/postgresql"
+mkdir -p "$LOG_DIR"
+chown postgres:postgres "$LOG_DIR"
+
+# Start PostgreSQL with SSL, logging, and pg_stat_statements
 exec docker-entrypoint.sh "$@" \
     -c ssl=on \
     -c ssl_cert_file="$SSL_DIR/server.crt" \
     -c ssl_key_file="$SSL_DIR/server.key" \
-    -c shared_preload_libraries=pg_stat_statements
+    -c shared_preload_libraries=pg_stat_statements \
+    -c log_destination=stderr \
+    -c logging_collector=on \
+    -c log_directory="$LOG_DIR" \
+    -c log_filename='postgresql.log' \
+    -c log_truncate_on_rotation=off \
+    -c log_rotation_age=1d \
+    -c log_rotation_size=50MB \
+    -c log_connections=on \
+    -c log_disconnections=on \
+    -c log_line_prefix='%h %t [%p] %q%u@%d '

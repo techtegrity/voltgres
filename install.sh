@@ -142,6 +142,13 @@ read -p "Press Enter for auto-generated [$default_pg_pass]: " pg_pass
 pg_pass=${pg_pass:-$default_pg_pass}
 echo ""
 
+# PostgreSQL port
+echo -e "PostgreSQL external port."
+echo -e "  Using a non-standard port (e.g. ${CYAN}54320${NC}) reduces automated scan attacks."
+read -p "Press Enter for default [54320]: " pg_port
+pg_port=${pg_port:-54320}
+echo ""
+
 # Google OAuth (optional)
 echo -e "Google OAuth (optional — enables ${CYAN}Sign in with Google${NC})"
 read -p "Google Client ID (leave blank to skip): " google_client_id
@@ -211,7 +218,12 @@ NEXT_PUBLIC_GOOGLE_ENABLED=$google_enabled
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=$pg_pass
 POSTGRES_DB=postgres
-POSTGRES_PORT=5432
+POSTGRES_PORT=$pg_port
+
+# fail2ban (auto-bans IPs after repeated failed auth attempts)
+# FAIL2BAN_MAXRETRY=5
+# FAIL2BAN_BANTIME=3600
+# FAIL2BAN_FINDTIME=600
 
 # Web UI port (only used when no domain is set)
 VOLTGRES_PORT=3000
@@ -242,6 +254,15 @@ echo -e "    Host:     ${BOLD}postgres${NC}"
 echo -e "    Port:     ${BOLD}5432${NC}"
 echo -e "    User:     ${BOLD}postgres${NC}"
 echo -e "    Password: ${BOLD}${pg_pass}${NC}"
+echo ""
+echo -e "  External connections (from your apps):"
+echo -e "    Port:     ${BOLD}${pg_port}${NC}"
+echo -e "    SSL:      ${BOLD}required${NC} (sslmode=require)"
+echo ""
+echo -e "  ${GREEN}Security:${NC}"
+echo -e "    - fail2ban: auto-bans IPs after 5 failed auth attempts"
+echo -e "    - TLS required for all external connections"
+echo -e "    - Non-standard port reduces automated scans"
 echo ""
 echo -e "  ${YELLOW}Save these credentials somewhere safe.${NC}"
 echo ""

@@ -1,0 +1,19 @@
+# Port migration override — exposes PostgreSQL on BOTH the legacy port (5432)
+# and your new port while you migrate apps one by one.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.port-migration.yml up -d
+#
+# Once all apps are migrated to the new port, stop using this override:
+#   docker compose up -d
+#
+# fail2ban automatically protects both ports during migration.
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  fail2ban:
+    environment:
+      - FAIL2BAN_POSTGRES_PORTS=${POSTGRES_PORT:-5432},5432

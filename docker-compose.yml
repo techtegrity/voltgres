@@ -45,6 +45,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - postgres-ssl:/var/lib/postgresql/ssl
+      - postgres-logs:/var/log/postgresql
       - caddy-data:/caddy-data:ro
       - ./pg-entrypoint.sh:/pg-entrypoint.sh:ro
     healthcheck:
@@ -54,6 +55,31 @@ services:
       retries: 5
     networks:
       - voltgres-net
+
+  fail2ban:
+    image: alpine:3.21
+    container_name: voltgres-fail2ban
+    restart: unless-stopped
+    entrypoint: ["/fail2ban-entrypoint.sh"]
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: host
+    environment:
+      - FAIL2BAN_POSTGRES_PORTS=${POSTGRES_PORT:-5432}
+      - FAIL2BAN_MAXRETRY=${FAIL2BAN_MAXRETRY:-5}
+      - FAIL2BAN_BANTIME=${FAIL2BAN_BANTIME:-3600}
+      - FAIL2BAN_FINDTIME=${FAIL2BAN_FINDTIME:-600}
+    volumes:
+      - postgres-logs:/var/log/postgresql:ro
+      - fail2ban-data:/var/lib/fail2ban
+      - ./fail2ban-entrypoint.sh:/fail2ban-entrypoint.sh:ro
+      - ./fail2ban/jail.local:/etc/fail2ban/jail.local:ro
+      - ./fail2ban/filter.d/postgresql.conf:/etc/fail2ban/filter.d/postgresql.conf:ro
+      - ./fail2ban/action.d/docker-iptables.conf:/etc/fail2ban/action.d/docker-iptables.conf:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   pgbouncer:
     image: edoburu/pgbouncer:latest
@@ -117,6 +143,8 @@ volumes:
   voltgres-data:
   postgres-data:
   postgres-ssl:
+  postgres-logs:
+  fail2ban-data:
   caddy-data:
   caddy-config:
 

@@ -63,6 +63,63 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+## Security
+
+Voltgres includes several layers of security for the bundled PostgreSQL out of the box.
+
+### fail2ban (automatic IP banning)
+
+A fail2ban sidecar container monitors PostgreSQL logs and automatically bans IPs after repeated failed authentication attempts. This is the primary defense against brute-force attacks.
+
+Defaults (configurable via `.env`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `FAIL2BAN_MAXRETRY` | `5` | Failed attempts before banning |
+| `FAIL2BAN_BANTIME` | `3600` | Ban duration in seconds (1 hour) |
+| `FAIL2BAN_FINDTIME` | `600` | Time window for counting failures (10 min) |
+
+Private networks (127.x, 10.x, 172.16.x, 192.168.x) are never banned.
+
+```bash
+# Check fail2ban status and banned IPs
+docker exec voltgres-fail2ban fail2ban-client status postgresql
+
+# Manually unban an IP
+docker exec voltgres-fail2ban fail2ban-client set postgresql unbanip 1.2.3.4
+```
+
+### TLS enforcement
+
+All external PostgreSQL connections require TLS. Non-encrypted connections are rejected via `hostssl`-only rules in `pg_hba.conf`. Your apps should connect with `sslmode=require` (or `no-verify` for self-signed certs).
+
+### Non-standard port
+
+New installations default to port `54320` instead of the standard `5432`. This eliminates the vast majority of automated scans which only target default ports.
+
+### Migrating to a non-standard port
+
+If you're running on the default port (5432) and want to switch, you can migrate your apps gradually without downtime:
+
+**Step 1:** Set the new port in `.env`:
+```bash
+POSTGRES_PORT=54320
+```
+
+**Step 2:** Start with both ports open (old 5432 + new 54320):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.port-migration.yml up -d
+```
+
+**Step 3:** Update your apps one by one to use port `54320`. No other connection changes needed — same host, same credentials, same `sslmode=require`.
+
+**Step 4:** Once all apps are migrated, drop the legacy port:
+```bash
+docker compose up -d
+```
+
+fail2ban automatically protects both ports during the migration period.
+
 ## Configuration Reference
 
 | Variable | Default | Description |
@@ -75,8 +132,12 @@ docker compose up -d --build
 | `POSTGRES_USER` | `postgres` | Bundled PostgreSQL superuser |
 | `POSTGRES_PASSWORD` | `voltgres` | Bundled PostgreSQL password |
 | `POSTGRES_DB` | `postgres` | Default database name |
-| `POSTGRES_PORT` | `5432` | Host port for PostgreSQL |
+| `POSTGRES_PORT` | `54320` | Host port for PostgreSQL |
+| `PGBOUNCER_PORT` | `6432` | Host port for PgBouncer |
 | `VOLTGRES_PORT` | `3000` | Host port for the web UI (when no domain is set) |
+| `FAIL2BAN_MAXRETRY` | `5` | Failed auth attempts before ban |
+| `FAIL2BAN_BANTIME` | `3600` | Ban duration in seconds |
+| `FAIL2BAN_FINDTIME` | `600` | Failure counting window in seconds |
 | `GOOGLE_CLIENT_ID` | (empty) | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | (empty) | Google OAuth secret (optional) |
 
@@ -86,6 +147,12 @@ docker compose up -d --build
 # View logs
 docker compose logs -f voltgres
 
+# View fail2ban logs
+docker compose logs -f fail2ban
+
+# Check banned IPs
+docker exec voltgres-fail2ban fail2ban-client status postgresql
+
 # Restart
 docker compose restart
 
@@ -93,8 +160,7 @@ docker compose restart
 docker compose down
 
 # Update to latest version
-git pull
-docker compose up -d --build
+./update.sh
 
 # Back up the SQLite config database
 docker cp voltgres:/app/data/voltgres.db ./voltgres-backup.db
@@ -102,10 +168,12 @@ docker cp voltgres:/app/data/voltgres.db ./voltgres-backup.db
 
 ## Connecting to the Bundled PostgreSQL from Outside
 
-The bundled PostgreSQL is exposed on port `5432` (configurable via `POSTGRES_PORT`).
+The bundled PostgreSQL is exposed on the port configured via `POSTGRES_PORT` (default: `54320`).
 
 ```bash
-psql -h your-vps-ip -U postgres -p 5432
+psql "host=your-vps-ip port=54320 user=postgres sslmode=require"
 ```
 
-To restrict external access, remove the `ports` mapping from the `postgres` service in `docker-compose.yml`.
+TLS is required for all external connections. Use `sslmode=require` in your connection strings.
+
+To restrict external access entirely, remove the `ports` mapping from the `postgres` service in `docker-compose.yml`.
