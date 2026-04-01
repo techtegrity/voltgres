@@ -97,49 +97,18 @@ start_cert_watcher() {
     ) &
 }
 
-# Enforce hostssl-only connections for external traffic while allowing
-# unencrypted connections from trusted Docker internal networks.
-enforce_hostssl() {
+# Restore pg_hba.conf to default state if it was previously modified
+# by the hostssl enforcer (which caused connection issues).
+restore_hba() {
     PGDATA="${PGDATA:-/var/lib/postgresql/data}"
     HBA="$PGDATA/pg_hba.conf"
-    if [ -f "$HBA" ]; then
-        # Replace 'host' with 'hostssl' for non-local connections
-        if grep -q '^host ' "$HBA"; then
-            sed -i 's/^host /hostssl /g' "$HBA"
-            echo "[pg-security] Enforced hostssl-only in pg_hba.conf (non-TLS connections rejected)"
-        fi
-
-        # Allow unencrypted connections from Docker internal networks (trusted).
-        # These lines must use 'host' (not 'hostssl') because internal services
-        # like voltgres and pgbouncer connect without TLS over the Docker bridge.
-        if grep -q '# voltgres-docker-internal' "$HBA"; then
-            # Fix existing entries that may have been converted to hostssl
-            sed -i '/# voltgres-docker-internal/,$ s/^hostssl \(all all 172\.16\)/host \1/' "$HBA"
-            sed -i '/# voltgres-docker-internal/,$ s/^hostssl \(all all 10\.0\)/host \1/' "$HBA"
-        else
-            echo "" >> "$HBA"
-            echo "# voltgres-docker-internal" >> "$HBA"
-            echo "host all all 172.16.0.0/12 scram-sha-256" >> "$HBA"
-            echo "host all all 10.0.0.0/8 scram-sha-256" >> "$HBA"
-        fi
-        echo "[pg-security] Allowed unencrypted access from Docker internal networks"
+    if [ -f "$HBA" ] && grep -q '# voltgres-docker-internal' "$HBA"; then
+        # Revert hostssl back to host for the default entries
+        sed -i 's/^hostssl \(.*all.*all.*\(127\|::1\|scram\)\)/host \1/' "$HBA"
+        # Remove our Docker internal lines — no longer needed
+        sed -i '/# voltgres-docker-internal/,$ d' "$HBA"
+        echo "[pg-security] Restored pg_hba.conf to default (removed hostssl enforcement)"
     fi
-}
-
-# After initial DB setup, enforce hostssl.
-# docker-entrypoint.sh only creates pg_hba.conf on first init,
-# so we patch it on every start to ensure it stays enforced.
-start_hostssl_enforcer() {
-    (
-        # Wait for pg_hba.conf to exist (first init can take a few seconds)
-        for _ in $(seq 1 30); do
-            if [ -f "${PGDATA:-/var/lib/postgresql/data}/pg_hba.conf" ]; then
-                enforce_hostssl
-                return
-            fi
-            sleep 1
-        done
-    ) &
 }
 
 # --- Main ---
@@ -150,11 +119,8 @@ copy_le_certs || generate_self_signed
 # Start background watcher for cert updates
 start_cert_watcher
 
-# Enforce hostssl on existing installations
-enforce_hostssl
-
-# Start hostssl enforcer for first-time init (when pg_hba.conf doesn't exist yet)
-start_hostssl_enforcer
+# Clean up any previous hostssl enforcement
+restore_hba
 
 # Determine log directory
 LOG_DIR="/var/log/postgresql"
