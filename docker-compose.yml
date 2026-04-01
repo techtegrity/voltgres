@@ -107,7 +107,7 @@ services:
       - SERVER_IDLE_TIMEOUT=300
       - QUERY_WAIT_TIMEOUT=120
       - ADMIN_USERS=${POSTGRES_USER:-postgres}
-      - IGNORE_STARTUP_PARAMETERS=extra_float_digits,search_path
+      - IGNORE_STARTUP_PARAMETERS=extra_float_digits,search_path,uselibpqcompat
       - CLIENT_TLS_SSLMODE=require
       - CLIENT_TLS_KEY_FILE=/etc/pgbouncer/tls/client.key
       - CLIENT_TLS_CERT_FILE=/etc/pgbouncer/tls/client.crt
