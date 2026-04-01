@@ -1154,3 +1154,35 @@ export async function getServerInfo(pool: Pool) {
     activeConnections: parseInt(activeConnResult.rows[0].count, 10),
   }
 }
+
+// ── Direct connection detection ───────────────────────────────────────
+// Returns databases that have connections NOT coming through PgBouncer
+// (i.e. from outside the Docker internal network). These are "direct"
+// connections that haven't been migrated to PgBouncer or the new port.
+
+export interface DirectConnectionInfo {
+  datname: string
+  direct_connections: number
+}
+
+export async function getDatabasesWithDirectConnections(pool: Pool): Promise<DirectConnectionInfo[]> {
+  const result = await pool.query(`
+    SELECT
+      datname,
+      count(*)::int AS direct_connections
+    FROM pg_stat_activity
+    WHERE datname IS NOT NULL
+      AND pid <> pg_backend_pid()
+      AND backend_type = 'client backend'
+      AND (
+        client_addr IS NOT NULL
+        AND client_addr::text NOT LIKE '172.%'
+        AND client_addr::text NOT LIKE '10.%'
+        AND client_addr::text NOT LIKE '192.168.%'
+        AND client_addr::text <> '127.0.0.1'
+        AND client_addr::text <> '::1'
+      )
+    GROUP BY datname
+  `)
+  return result.rows
+}

@@ -127,6 +127,17 @@ export default function DatabasesPage() {
       .catch(() => {})
   }, [databases])
 
+  // Direct connections (not through PgBouncer / Docker internal network)
+  const [directConnections, setDirectConnections] = useState<Record<string, number>>({})
+  useEffect(() => {
+    fetch("/api/pg/direct-connections")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) setDirectConnections(data.databases ?? {})
+      })
+      .catch(() => {})
+  }, [databases])
+
   // Ownership issue tracking
   const [ownershipIssues, setOwnershipIssues] = useState<Record<string, number>>({})
   useEffect(() => {
@@ -552,7 +563,19 @@ export default function DatabasesPage() {
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-primary/10">
+                        <div className="relative p-2 rounded-md bg-primary/10">
+                          {directConnections[db.name] > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-yellow-500 border border-background" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{directConnections[db.name]} direct connection{directConnections[db.name] > 1 ? "s" : ""} — not using PgBouncer</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Database className="w-4 h-4 text-primary" />
                         </div>
                         <div className="flex flex-col">
