@@ -136,7 +136,7 @@ if [ -n "$domain" ]; then
 fi
 
 # PostgreSQL password
-default_pg_pass=$(openssl rand -base64 16 | tr -d '=/+' | head -c 20)
+default_pg_pass=$(openssl rand -hex 12 | head -c 20)
 echo -e "PostgreSQL password for the bundled database."
 read -p "Press Enter for auto-generated [$default_pg_pass]: " pg_pass
 pg_pass=${pg_pass:-$default_pg_pass}

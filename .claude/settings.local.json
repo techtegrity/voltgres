@@ -46,7 +46,8 @@
       "Bash(docker run:*)",
       "Bash(POSTGRES_PORT=5433 PGBOUNCER_PORT=6433 docker compose up -d postgres pgbouncer)",
       "Bash(node migrate.mjs)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.*)"
     ]
   }
 }
