@@ -6,11 +6,11 @@ if ! command -v fail2ban-server >/dev/null 2>&1; then
     apk add --no-cache fail2ban iptables ip6tables >/dev/null 2>&1
 fi
 
-# Disable all default jails (e.g. sshd) that look for logs we don't have.
-# The default jail.conf may have explicit enabled=true per jail, so we
-# must also remove/truncate the stock jail.conf to prevent sshd loading.
-echo -e "[DEFAULT]\nenabled = false" > /etc/fail2ban/jail.d/00-disable-defaults.local
-: > /etc/fail2ban/jail.conf
+# Remove all default jail configs (sshd, etc.) that ship with the package.
+# We only want our postgresql jail from the mounted config files.
+rm -f /etc/fail2ban/jail.conf
+rm -f /etc/fail2ban/jail.d/*.conf 2>/dev/null
+rm -f /etc/fail2ban/jail.d/*.local 2>/dev/null
 
 # Config files are mounted read-only, so copy them to writable locations
 cp /etc/fail2ban/jail.local /etc/fail2ban/jail.d/postgresql.local
