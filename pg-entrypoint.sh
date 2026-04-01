@@ -97,8 +97,8 @@ start_cert_watcher() {
     ) &
 }
 
-# Enforce hostssl-only connections (reject unencrypted remote connections).
-# Runs on every startup so both new and existing installations are covered.
+# Enforce hostssl-only connections for external traffic while allowing
+# unencrypted connections from trusted Docker internal networks.
 enforce_hostssl() {
     PGDATA="${PGDATA:-/var/lib/postgresql/data}"
     HBA="$PGDATA/pg_hba.conf"
@@ -107,6 +107,15 @@ enforce_hostssl() {
         if grep -q '^host ' "$HBA"; then
             sed -i 's/^host /hostssl /g' "$HBA"
             echo "[pg-security] Enforced hostssl-only in pg_hba.conf (non-TLS connections rejected)"
+        fi
+
+        # Allow unencrypted connections from Docker internal networks (trusted)
+        if ! grep -q '# voltgres-docker-internal' "$HBA"; then
+            echo "" >> "$HBA"
+            echo "# voltgres-docker-internal" >> "$HBA"
+            echo "host all all 172.16.0.0/12 scram-sha-256" >> "$HBA"
+            echo "host all all 10.0.0.0/8 scram-sha-256" >> "$HBA"
+            echo "[pg-security] Allowed unencrypted access from Docker internal networks"
         fi
     fi
 }
