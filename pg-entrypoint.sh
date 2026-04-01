@@ -109,14 +109,20 @@ enforce_hostssl() {
             echo "[pg-security] Enforced hostssl-only in pg_hba.conf (non-TLS connections rejected)"
         fi
 
-        # Allow unencrypted connections from Docker internal networks (trusted)
-        if ! grep -q '# voltgres-docker-internal' "$HBA"; then
+        # Allow unencrypted connections from Docker internal networks (trusted).
+        # These lines must use 'host' (not 'hostssl') because internal services
+        # like voltgres and pgbouncer connect without TLS over the Docker bridge.
+        if grep -q '# voltgres-docker-internal' "$HBA"; then
+            # Fix existing entries that may have been converted to hostssl
+            sed -i '/# voltgres-docker-internal/,$ s/^hostssl \(all all 172\.16\)/host \1/' "$HBA"
+            sed -i '/# voltgres-docker-internal/,$ s/^hostssl \(all all 10\.0\)/host \1/' "$HBA"
+        else
             echo "" >> "$HBA"
             echo "# voltgres-docker-internal" >> "$HBA"
             echo "host all all 172.16.0.0/12 scram-sha-256" >> "$HBA"
             echo "host all all 10.0.0.0/8 scram-sha-256" >> "$HBA"
-            echo "[pg-security] Allowed unencrypted access from Docker internal networks"
         fi
+        echo "[pg-security] Allowed unencrypted access from Docker internal networks"
     fi
 }
 
