@@ -2,6 +2,9 @@
 
 import { use } from "react"
 import { DatabaseSidebar } from "@/components/database-sidebar"
+import { MobileSidebarProvider } from "@/components/mobile-sidebar-wrapper"
+import { MobileHeader } from "@/components/mobile-header"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function DatabaseLayout({
   children,
@@ -14,11 +17,13 @@ export default function DatabaseLayout({
   const dbName = decodeURIComponent(id)
 
   return (
-    <div className="flex h-screen bg-background">
-      <DatabaseSidebar databaseId={id} databaseName={dbName} />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+    <MobileSidebarProvider
+      sidebar={<DatabaseSidebar databaseId={id} databaseName={dbName} />}
+    >
+      <MobileHeader>
+        <ThemeToggle />
+      </MobileHeader>
+      {children}
+    </MobileSidebarProvider>
   )
 }

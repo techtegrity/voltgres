@@ -1,6 +1,9 @@
 "use client"
 
 import { OrgSidebar } from "@/components/org-sidebar"
+import { MobileSidebarProvider } from "@/components/mobile-sidebar-wrapper"
+import { MobileHeader } from "@/components/mobile-header"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function OrgLayout({
   children,
@@ -8,11 +11,11 @@ export default function OrgLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-background">
-      <OrgSidebar />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+    <MobileSidebarProvider sidebar={<OrgSidebar />}>
+      <MobileHeader>
+        <ThemeToggle />
+      </MobileHeader>
+      {children}
+    </MobileSidebarProvider>
   )
 }

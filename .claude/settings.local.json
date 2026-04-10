@@ -47,7 +47,21 @@
       "Bash(POSTGRES_PORT=5433 PGBOUNCER_PORT=6433 docker compose up -d postgres pgbouncer)",
       "Bash(node migrate.mjs)",
       "Bash(node -e \":*)",
-      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.*)"
+      "Bash(ls -la /Users/chris/Repos/mine/Techtegrity/voltgres/*.*)",
+      "Bash(find /Users/chris/Repos/mine/Techtegrity/voltgres -path \"*dashboard*\\(org\\)*page.tsx\")",
+      "Bash(cat \"/Users/chris/Repos/mine/Techtegrity/voltgres/app/dashboard/\\(org\\)/page.tsx\")",
+      "Bash(cat \"/Users/chris/Repos/mine/Techtegrity/voltgres/app/dashboard/\\(org\\)/settings/layout.tsx\")",
+      "Bash(cat \"/Users/chris/Repos/mine/Techtegrity/voltgres/app/dashboard/\\(org\\)/settings/page.tsx\")",
+      "Bash(psql \"postgresql://valrank_user:FqUv4gE5YDQhJx9bJYJF@voltgres.techtegrity.net:6432/valrank?sslmode=require\" -c \"SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 5;\")",
+      "Bash(DATABASE_URL=\"postgresql://valrank_user:FqUv4gE5YDQhJx9bJYJF@voltgres.techtegrity.net:6432/valrank?sslmode=require&uselibpqcompat=true\" npx tsx -e \":*)",
+      "Bash(export PATH=\"$HOME/.local/share/mise/shims:$HOME/.local/bin:$HOME/.nvm/versions/node/*/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\")",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(DATABASE_URL=\"postgresql://valrank_user:FqUv4gE5YDQhJx9bJYJF@voltgres.techtegrity.net:6432/valrank?sslmode=require&uselibpqcompat=true\" node -e \":*)",
+      "Bash(DATABASE_URL=\"postgresql://valrank_user:FqUv4gE5YDQhJx9bJYJF@voltgres.techtegrity.net:6432/valrank?sslmode=require\" node -e \":*)",
+      "Bash(grep -n \"execFile\\\\|system\\\\|child_process\\\\|exec\" /Users/chris/Repos/mine/Techtegrity/voltgres/lib/snapshots/*.ts)",
+      "Bash(grep -n \"targetDatabase\\\\|database\" /Users/chris/Repos/mine/Techtegrity/voltgres/app/api/snapshots/[id]/restore/route.ts)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm rebuild:*)"
     ]
   }
 }

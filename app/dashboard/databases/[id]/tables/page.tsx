@@ -22,7 +22,14 @@ import {
   Database,
   AlertTriangle,
   RefreshCw,
+  List,
 } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { TableDataGrid } from "@/components/tables/table-data-grid"
 import { TableStructureView } from "@/components/tables/table-structure-view"
 import { TableToolbar } from "@/components/tables/table-toolbar"
@@ -46,6 +53,9 @@ export default function DatabaseTablesPage({
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [selectedSchema, setSelectedSchema] = useState<string>("public")
   const [activeTab, setActiveTab] = useState<"content" | "structure">("content")
+
+  const isMobile = useIsMobile()
+  const [tableListOpen, setTableListOpen] = useState(false)
 
   // CRUD dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -78,6 +88,7 @@ export default function DatabaseTablesPage({
       setSelectedSchema(schema)
       setSelectedTable(name)
     }
+    setTableListOpen(false)
   }
 
   const handleEditRow = (row: Record<string, unknown>) => {
@@ -119,79 +130,107 @@ export default function DatabaseTablesPage({
     (t) => t.name === selectedTable && t.schema === selectedSchema
   )
 
+  const tableListContent = (
+    <>
+      <div className="p-3 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
+          <Database className="w-4 h-4 text-primary shrink-0" />
+          {dbName}
+        </h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {tables.length} {tables.length === 1 ? "table" : "tables"}
+        </p>
+      </div>
+
+      <ScrollArea className="flex-1 min-h-0">
+        {tablesLoading ? (
+          <div className="px-3 py-8 text-center text-muted-foreground text-xs">
+            Loading tables...
+          </div>
+        ) : tables.length === 0 ? (
+          <div className="px-3 py-8 text-center text-muted-foreground text-xs">
+            No tables found
+          </div>
+        ) : (
+          <div className="py-1">
+            {schemas.map((schema) => (
+              <div key={schema}>
+                {schemas.length > 1 && (
+                  <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {schema}
+                  </div>
+                )}
+                {schemaGroups[schema].map((table) => {
+                  const isSelected =
+                    selectedTable === table.name &&
+                    selectedSchema === schema
+                  return (
+                    <button
+                      key={`${schema}.${table.name}`}
+                      onClick={() => handleSelectTable(schema, table.name)}
+                      className={`w-full px-3 py-1.5 text-left hover:bg-muted/50 transition-colors flex items-center justify-between group ${
+                        isSelected
+                          ? "bg-primary/10 text-primary"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Table2 className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                        <span className="font-mono text-xs truncate">
+                          {table.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
+                        {formatNumber(table.row_count)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </>
+  )
+
   return (
     <TooltipProvider>
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-        {/* Left sidebar — table list */}
-        <div className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
-          <div className="p-3 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
-              <Database className="w-4 h-4 text-primary shrink-0" />
-              {dbName}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {tables.length} {tables.length === 1 ? "table" : "tables"}
-            </p>
-          </div>
-
-          <ScrollArea className="flex-1 min-h-0">
-            {tablesLoading ? (
-              <div className="px-3 py-8 text-center text-muted-foreground text-xs">
-                Loading tables...
-              </div>
-            ) : tables.length === 0 ? (
-              <div className="px-3 py-8 text-center text-muted-foreground text-xs">
-                No tables found
-              </div>
-            ) : (
-              <div className="py-1">
-                {schemas.map((schema) => (
-                  <div key={schema}>
-                    {schemas.length > 1 && (
-                      <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        {schema}
-                      </div>
-                    )}
-                    {schemaGroups[schema].map((table) => {
-                      const isSelected =
-                        selectedTable === table.name &&
-                        selectedSchema === schema
-                      return (
-                        <button
-                          key={`${schema}.${table.name}`}
-                          onClick={() => handleSelectTable(schema, table.name)}
-                          className={`w-full px-3 py-1.5 text-left hover:bg-muted/50 transition-colors flex items-center justify-between group ${
-                            isSelected
-                              ? "bg-primary/10 text-primary"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Table2 className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                            <span className="font-mono text-xs truncate">
-                              {table.name}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
-                            {formatNumber(table.row_count)}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left sidebar — table list (desktop) */}
+        <div className="hidden md:flex w-64 shrink-0 border-r border-border bg-card flex-col">
+          {tableListContent}
         </div>
+
+        {/* Mobile table list sheet */}
+        {isMobile && (
+          <Sheet open={tableListOpen} onOpenChange={setTableListOpen}>
+            <SheetContent side="left" className="w-64 p-0 gap-0">
+              <SheetTitle className="sr-only">Tables</SheetTitle>
+              <div className="flex flex-col h-full">
+                {tableListContent}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Right panel — table content */}
         <div className="flex-1 min-w-0 flex flex-col">
           {selectedTable && selectedTableMeta ? (
             <>
               {/* Header */}
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+              <div className="px-3 md:px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
+                  {/* Mobile table list toggle */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 md:hidden shrink-0"
+                    onClick={() => setTableListOpen(true)}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+
                   <div className="min-w-0">
                     <h1 className="font-mono text-base font-semibold truncate">
                       {selectedSchema !== "public" && (
@@ -227,7 +266,7 @@ export default function DatabaseTablesPage({
                   <Tabs
                     value={activeTab}
                     onValueChange={(v) => setActiveTab(v as "content" | "structure")}
-                    className="ml-4"
+                    className="ml-auto sm:ml-4"
                   >
                     <TabsList className="h-8">
                       <TabsTrigger value="content" className="text-xs px-3 h-7">
@@ -250,7 +289,7 @@ export default function DatabaseTablesPage({
                       onClick={handleDeleteSelected}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Delete ({tableData.selectedRows.size})
+                      <span className="hidden sm:inline">Delete</span> ({tableData.selectedRows.size})
                     </Button>
                   )}
 
@@ -276,7 +315,7 @@ export default function DatabaseTablesPage({
                     onClick={() => setAddDialogOpen(true)}
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add Record
+                    <span className="hidden sm:inline">Add Record</span>
                   </Button>
                 </div>
               </div>
@@ -352,28 +391,30 @@ export default function DatabaseTablesPage({
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
 
-                          {/* Page numbers */}
-                          {generatePageNumbers(tableData.page, tableData.totalPages).map(
-                            (p, i) =>
-                              p === "..." ? (
-                                <span
-                                  key={`dots-${i}`}
-                                  className="px-1 text-xs text-muted-foreground"
-                                >
-                                  ...
-                                </span>
-                              ) : (
-                                <Button
-                                  key={p}
-                                  variant={p === tableData.page ? "default" : "outline"}
-                                  size="icon"
-                                  className="h-7 w-7 text-xs"
-                                  onClick={() => tableData.setPage(p as number)}
-                                >
-                                  {p}
-                                </Button>
-                              )
-                          )}
+                          {/* Page numbers (hidden on mobile) */}
+                          <div className="hidden sm:flex items-center gap-1">
+                            {generatePageNumbers(tableData.page, tableData.totalPages).map(
+                              (p, i) =>
+                                p === "..." ? (
+                                  <span
+                                    key={`dots-${i}`}
+                                    className="px-1 text-xs text-muted-foreground"
+                                  >
+                                    ...
+                                  </span>
+                                ) : (
+                                  <Button
+                                    key={p}
+                                    variant={p === tableData.page ? "default" : "outline"}
+                                    size="icon"
+                                    className="h-7 w-7 text-xs"
+                                    onClick={() => tableData.setPage(p as number)}
+                                  >
+                                    {p}
+                                  </Button>
+                                )
+                            )}
+                          </div>
 
                           <Button
                             variant="outline"
@@ -404,9 +445,17 @@ export default function DatabaseTablesPage({
                 <h2 className="text-lg font-medium text-muted-foreground mb-1">
                   Select a table
                 </h2>
-                <p className="text-sm text-muted-foreground/70">
+                <p className="text-sm text-muted-foreground/70 mb-4">
                   Choose a table from the sidebar to browse its data
                 </p>
+                <Button
+                  variant="outline"
+                  className="md:hidden"
+                  onClick={() => setTableListOpen(true)}
+                >
+                  <List className="w-4 h-4 mr-2" />
+                  Browse Tables
+                </Button>
               </div>
             </div>
           )}

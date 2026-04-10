@@ -25,7 +25,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         </p>
       </div>
 
-      <nav className="bg-muted inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px] mb-6">
+      <nav className="bg-muted inline-flex h-9 w-fit max-w-full items-center justify-start rounded-lg p-[3px] mb-6 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive =
             tab.href === "/dashboard/settings"
@@ -44,7 +44,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               )}
             >
               <tab.icon className="w-3.5 h-3.5" />
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
             </Link>
           )
         })}
