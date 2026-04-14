@@ -47,7 +47,7 @@ export function DatabaseSidebar({ databaseId, databaseName }: DatabaseSidebarPro
     { name: "SQL Editor", href: `${basePath}/sql`, icon: Terminal },
     { name: "Tables", href: `${basePath}/tables`, icon: Table2 },
     { name: "Activity", href: `${basePath}/activity`, icon: Activity },
-    { name: "Data", href: `${basePath}/data`, icon: HardDrive },
+    { name: "Backups", href: `${basePath}/backups`, icon: HardDrive },
     { name: "Users", href: `${basePath}/users`, icon: Users },
     { name: "Access Control", href: `${basePath}/access`, icon: Shield },
   ]

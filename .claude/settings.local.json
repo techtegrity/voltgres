@@ -61,7 +61,8 @@
       "Bash(grep -n \"execFile\\\\|system\\\\|child_process\\\\|exec\" /Users/chris/Repos/mine/Techtegrity/voltgres/lib/snapshots/*.ts)",
       "Bash(grep -n \"targetDatabase\\\\|database\" /Users/chris/Repos/mine/Techtegrity/voltgres/app/api/snapshots/[id]/restore/route.ts)",
       "Bash(pnpm build:*)",
-      "Bash(pnpm rebuild:*)"
+      "Bash(pnpm rebuild:*)",
+      "Bash(git mv:*)"
     ]
   }
 }
