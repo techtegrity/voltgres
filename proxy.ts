@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { isAccessAllowed, getClientIp } from "@/lib/access-control"
 import { checkRateLimit } from "@/lib/rate-limit"
 
-const BLOCKED_HTML = `<!DOCTYPE html>
+function blockedHtml(clientIp: string): string {
+  // Sanitize IP for safe HTML embedding (strip anything not valid in an IP)
+  const safeIp = clientIp.replace(/[^a-fA-F0-9.:]/g, "")
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -33,16 +36,20 @@ const BLOCKED_HTML = `<!DOCTYPE html>
       display: flex;
       align-items: center;
       justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .icon svg { width: 24px; height: 24px; color: #ef4444; }
     h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
     p { color: #a1a1aa; font-size: 0.875rem; line-height: 1.5; }
     .code { margin-top: 1rem; color: #52525b; font-size: 0.75rem; font-family: monospace; }
+    .ip { margin-top: 0.75rem; color: #52525b; font-size: 0.75rem; font-family: monospace; display: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="icon">
+    <div class="icon" id="lock">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
       </svg>
@@ -50,9 +57,14 @@ const BLOCKED_HTML = `<!DOCTYPE html>
     <h1>Access Denied</h1>
     <p>Your IP address is not authorized to access this Voltgres instance. Contact the administrator if you believe this is an error.</p>
     <p class="code">403 Forbidden</p>
+    <p class="ip" id="ip">Your IP: ${safeIp}</p>
   </div>
+  <script>
+    var c=0;document.getElementById("lock").onclick=function(){if(++c>=5)document.getElementById("ip").style.display="block"}
+  </script>
 </body>
 </html>`
+}
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -65,7 +77,8 @@ export async function proxy(req: NextRequest) {
   // Access control check
   const allowed = await isAccessAllowed(req)
   if (!allowed) {
-    return new NextResponse(BLOCKED_HTML, {
+    const clientIp = getClientIp(req)
+    return new NextResponse(blockedHtml(clientIp), {
       status: 403,
       headers: { "Content-Type": "text/html" },
     })
