@@ -33,6 +33,21 @@ export function invalidateAccessRuleCache() {
   cacheTime = 0
 }
 
+// Parse ALLOWED_IPS env var (space-separated IPs/CIDRs, same format Caddy uses).
+// Entries with "/" are treated as CIDR, otherwise as plain IPs.
+function getEnvRules(): { type: "ip" | "cidr"; value: string }[] {
+  const raw = process.env.ALLOWED_IPS
+  if (!raw) return []
+  return raw
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((value) => ({
+      type: value.includes("/") ? ("cidr" as const) : ("ip" as const),
+      value,
+    }))
+}
+
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for")
   if (forwarded) {
@@ -81,9 +96,11 @@ export async function isAccessAllowed(request: NextRequest): Promise<boolean> {
     if (headerBypass === bypassToken) return true
   }
 
-  const rules = await getEnabledRules()
+  const envRules = getEnvRules()
+  const dbRules = await getEnabledRules()
+  const rules = [...envRules, ...dbRules]
 
-  // No enabled rules = access control is off (safety net)
+  // No rules configured in either .env or DB = access control is off (safety net)
   if (rules.length === 0) return true
 
   const clientIp = getClientIp(request)

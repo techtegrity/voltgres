@@ -41,6 +41,7 @@ describe("access-control", () => {
     mockRules.length = 0
     invalidateAccessRuleCache()
     delete process.env.BYPASS_TOKEN
+    delete process.env.ALLOWED_IPS
   })
 
   describe("bypass token", () => {
@@ -139,6 +140,41 @@ describe("access-control", () => {
         ip: "1.2.3.4",
       })
       expect(await isAccessAllowed(req)).toBe(false)
+    })
+  })
+
+  describe("ALLOWED_IPS env var", () => {
+    it("allows IP listed in ALLOWED_IPS", async () => {
+      process.env.ALLOWED_IPS = "203.0.113.5"
+      const req = makeRequest({ ip: "203.0.113.5" })
+      expect(await isAccessAllowed(req)).toBe(true)
+    })
+
+    it("allows IP within CIDR listed in ALLOWED_IPS", async () => {
+      process.env.ALLOWED_IPS = "10.0.0.0/8"
+      const req = makeRequest({ ip: "10.1.2.3" })
+      expect(await isAccessAllowed(req)).toBe(true)
+    })
+
+    it("supports multiple space-separated entries", async () => {
+      process.env.ALLOWED_IPS = "203.0.113.5 10.0.0.0/8 192.168.1.1"
+      expect(await isAccessAllowed(makeRequest({ ip: "10.5.5.5" }))).toBe(true)
+      invalidateAccessRuleCache()
+      expect(await isAccessAllowed(makeRequest({ ip: "192.168.1.1" }))).toBe(true)
+    })
+
+    it("blocks IPs not in ALLOWED_IPS when set", async () => {
+      process.env.ALLOWED_IPS = "203.0.113.5"
+      const req = makeRequest({ ip: "192.168.1.1" })
+      expect(await isAccessAllowed(req)).toBe(false)
+    })
+
+    it("merges with DB rules (either source grants access)", async () => {
+      process.env.ALLOWED_IPS = "203.0.113.5"
+      mockRules.push({ type: "ip", value: "192.168.1.1" })
+      expect(await isAccessAllowed(makeRequest({ ip: "203.0.113.5" }))).toBe(true)
+      invalidateAccessRuleCache()
+      expect(await isAccessAllowed(makeRequest({ ip: "192.168.1.1" }))).toBe(true)
     })
   })
 
