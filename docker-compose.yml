@@ -22,6 +22,8 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-voltgres}
+      - PUBLIC_POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - PUBLIC_PGBOUNCER_PORT=${PGBOUNCER_PORT:-6432}
     volumes:
       - voltgres-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
