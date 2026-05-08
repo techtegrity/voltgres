@@ -67,6 +67,35 @@ docker compose up -d --build
 
 Voltgres includes several layers of security for the bundled PostgreSQL out of the box.
 
+### Host firewall (ufw)
+
+**fail2ban is not a perimeter firewall** — it only watches Postgres credential brute-force on `POSTGRES_PORT`. It doesn't protect SSH, PgBouncer, or close ports you didn't intend to expose (like `:3000` direct to the web UI when running with HTTPS). Run a host firewall in front of fail2ban.
+
+The installer prints suggested `ufw` rules tailored to your install, but here's the recipe (allow SSH **first**, or you'll lock yourself out):
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp comment 'SSH'
+sudo ufw allow 80/tcp                       # Caddy HTTP→HTTPS redirect (HTTPS installs only)
+sudo ufw allow 443 comment 'HTTPS'          # TCP+UDP for HTTP/3 (HTTPS installs only)
+sudo ufw allow 3000/tcp                     # web UI (only if no DOMAIN set)
+sudo ufw allow 54320/tcp comment 'PostgreSQL'   # substitute your POSTGRES_PORT
+sudo ufw allow 6432/tcp comment 'PgBouncer'
+sudo ufw enable
+```
+
+When `DOMAIN` is set, do **not** open `3000` — all web traffic should go through Caddy on `443`. The `:3000` mapping exists for the no-domain (HTTP-only) install path.
+
+For tighter lockdown, restrict Postgres/PgBouncer to known source IPs:
+
+```bash
+sudo ufw allow from 203.0.113.5 to any port 54320 proto tcp
+sudo ufw allow from 203.0.113.5 to any port 6432 proto tcp
+```
+
+Other firewalls (Hetzner Cloud Firewall, nftables, firewalld, AWS Security Groups) work the same way — apply the same allowlist at whichever layer you use.
+
 ### fail2ban (automatic IP banning)
 
 A fail2ban sidecar container monitors PostgreSQL logs and automatically bans IPs after repeated failed authentication attempts. This is the primary defense against brute-force attacks.

@@ -273,3 +273,44 @@ else
     echo -e "  External clients need ${CYAN}sslmode=no-verify${NC} or ${CYAN}sslmode=require${NC} with driver config."
 fi
 echo ""
+
+# Recommended host firewall hardening
+# fail2ban only watches Postgres credential brute-force on $pg_port — it is NOT
+# a perimeter firewall. Print the exact ufw commands the operator should run,
+# but never enable ufw automatically (risk of SSH lockout, and the operator may
+# use Hetzner Cloud Firewall / nftables / firewalld instead).
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo -e "  ${YELLOW}${BOLD}Recommended: enable a host firewall${NC}"
+    echo -e "    fail2ban only protects Postgres auth on port ${pg_port}."
+    echo -e "    A perimeter firewall closes everything else (e.g. direct :3000)."
+    echo ""
+    if command -v ufw &>/dev/null; then
+        ufw_status=$(ufw status 2>/dev/null | head -n1)
+        if echo "$ufw_status" | grep -q inactive; then
+            echo -e "    Detected ${BOLD}ufw${NC} (currently ${YELLOW}inactive${NC}). Run these in order:"
+        else
+            echo -e "    Detected ${BOLD}ufw${NC}. Suggested rules:"
+        fi
+        echo -e "      ${CYAN}sudo ufw default deny incoming${NC}"
+        echo -e "      ${CYAN}sudo ufw default allow outgoing${NC}"
+        echo -e "      ${CYAN}sudo ufw allow 22/tcp comment 'SSH'${NC}    ${YELLOW}# do this first or lock yourself out${NC}"
+        if [ -n "$domain" ]; then
+            echo -e "      ${CYAN}sudo ufw allow 80/tcp${NC}                 ${YELLOW}# Caddy HTTP→HTTPS redirect${NC}"
+            echo -e "      ${CYAN}sudo ufw allow 443 comment 'HTTPS'${NC}    ${YELLOW}# TCP+UDP for HTTP/3${NC}"
+        else
+            echo -e "      ${CYAN}sudo ufw allow 3000/tcp${NC}               ${YELLOW}# web UI (no domain set)${NC}"
+        fi
+        echo -e "      ${CYAN}sudo ufw allow ${pg_port}/tcp comment 'PostgreSQL'${NC}"
+        echo -e "      ${CYAN}sudo ufw allow 6432/tcp comment 'PgBouncer'${NC}"
+        echo -e "      ${CYAN}sudo ufw enable${NC}"
+        if [ -n "$domain" ]; then
+            echo ""
+            echo -e "    Note: this intentionally does not open ${BOLD}3000${NC} — all web traffic goes through Caddy on 443."
+        fi
+    else
+        echo -e "    ${BOLD}ufw${NC} is not installed. Install it (or configure your cloud firewall) to allow:"
+        echo -e "      22/tcp (SSH), $([ -n "$domain" ] && echo "80/tcp + 443 (Caddy)" || echo "3000/tcp (web UI)"), ${pg_port}/tcp (PG), 6432/tcp (PgBouncer)"
+        echo -e "    See ${CYAN}INSTALL.md → Security → Host firewall${NC} for the full recipe."
+    fi
+    echo ""
+fi
