@@ -37,6 +37,7 @@ export interface DatabaseRow {
   tup_inserted: number
   tup_updated: number
   tup_deleted: number
+  allow_connections?: boolean
 }
 
 export interface PgUserRow {
@@ -367,6 +368,11 @@ export const api = {
     delete: (name: string) =>
       apiFetch(`/api/pg/databases/${encodeURIComponent(name)}`, {
         method: "DELETE",
+      }),
+    update: (name: string, data: { allowConnections: boolean }) =>
+      apiFetch(`/api/pg/databases/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
       }),
     checkOwnership: (name: string) =>
       apiFetch<{ misconfiguredCount: number }>(

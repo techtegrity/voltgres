@@ -61,7 +61,8 @@ export async function getDatabaseInfo(pool: Pool, dbName: string) {
       r.rolname AS owner,
       pg_encoding_to_char(d.encoding) AS encoding,
       pg_database_size(d.datname) AS size_bytes,
-      d.datcollate AS collation
+      d.datcollate AS collation,
+      d.datallowconn AS allow_connections
     FROM pg_database d
     JOIN pg_roles r ON d.datdba = r.oid
     WHERE d.datname = $1
@@ -114,6 +115,17 @@ export async function dropDatabase(pool: Pool, name: string) {
     [safeName]
   )
   await pool.query(`DROP DATABASE "${safeName}"`)
+}
+
+export async function setDatabaseAllowConnections(
+  pool: Pool,
+  name: string,
+  allow: boolean
+) {
+  const safeName = name.replace(/[^a-zA-Z0-9_]/g, "_")
+  await pool.query(
+    `ALTER DATABASE "${safeName}" WITH ALLOW_CONNECTIONS ${allow ? "true" : "false"}`
+  )
 }
 
 export async function listPgUsers(pool: Pool) {

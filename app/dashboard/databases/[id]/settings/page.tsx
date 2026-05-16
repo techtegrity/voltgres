@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { DeleteDatabaseDialog } from "@/components/delete-database-dialog"
 import { Trash2, AlertTriangle, Shield, Loader2, CheckCircle2 } from "lucide-react"
 
@@ -25,6 +26,8 @@ export default function DatabaseSettingsPage({
   const [ownershipFixed, setOwnershipFixed] = useState(false)
   const [ownershipError, setOwnershipError] = useState<string | null>(null)
   const [misconfiguredCount, setMisconfiguredCount] = useState(0)
+  const [updatingConnections, setUpdatingConnections] = useState(false)
+  const [connectionsError, setConnectionsError] = useState<string | null>(null)
 
   useEffect(() => {
     api.databases.get(dbName).then(setDbInfo).catch(() => {})
@@ -137,6 +140,48 @@ export default function DatabaseSettingsPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Connections */}
+      <Card className="bg-card border-border mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Connections</CardTitle>
+          <CardDescription>
+            Control whether Postgres accepts new connections to this database
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
+            <div className="pr-4">
+              <p className="font-medium text-foreground">Allow connections</p>
+              <p className="text-sm text-muted-foreground">
+                When off, Postgres rejects new connections from all clients. Existing sessions stay open until they disconnect.
+              </p>
+            </div>
+            <Switch
+              checked={dbInfo?.allow_connections ?? true}
+              disabled={updatingConnections || !dbInfo}
+              onCheckedChange={async (next) => {
+                if (!dbInfo) return
+                const previous = dbInfo.allow_connections
+                setConnectionsError(null)
+                setDbInfo({ ...dbInfo, allow_connections: next })
+                setUpdatingConnections(true)
+                try {
+                  await api.databases.update(dbName, { allowConnections: next })
+                } catch (err) {
+                  setDbInfo({ ...dbInfo, allow_connections: previous })
+                  setConnectionsError((err as Error).message)
+                } finally {
+                  setUpdatingConnections(false)
+                }
+              }}
+            />
+          </div>
+          {connectionsError && (
+            <p className="mt-2 text-sm text-destructive">{connectionsError}</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Danger Zone */}
       <Card className="bg-card border-destructive/50">
