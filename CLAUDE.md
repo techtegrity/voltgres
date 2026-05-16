@@ -64,3 +64,17 @@ const rows = db.select().from(someTable).where(eq(someTable.userId, userId))
 - `update.sh` — git pull + rebuild (the standard deploy flow)
 - `docker-compose.port-migration.yml` — override for running both old and new PostgreSQL ports during migration
 - Caddy auto-provisions Let's Encrypt certs when `DOMAIN` is set and `--profile https` is used
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in the techtegrity/voltgres GitHub Issues, accessed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
