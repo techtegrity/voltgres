@@ -555,29 +555,37 @@ export default function DatabasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedDatabases.map((db) => (
+                {sortedDatabases.map((db) => {
+                  const isDisabled = db.allow_connections === false
+                  return (
                   <tr
                     key={db.name}
-                    className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
+                    className={`border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer ${isDisabled ? "opacity-60" : ""}`}
                     onClick={() => router.push(`/dashboard/databases/${encodeURIComponent(db.name)}`)}
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="relative p-2 rounded-md bg-primary/10">
-                          {directConnections[db.name] > 0 && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`relative p-2 rounded-md ${isDisabled ? "bg-muted" : "bg-primary/10"}`}>
+                                {directConnections[db.name] > 0 && !isDisabled && (
                                   <span className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-yellow-500 border border-background" />
-                                </TooltipTrigger>
-                                <TooltipContent>
+                                )}
+                                <Database className={`w-4 h-4 ${isDisabled ? "text-muted-foreground" : "text-primary"}`} />
+                              </div>
+                            </TooltipTrigger>
+                            {(isDisabled || directConnections[db.name] > 0) && (
+                              <TooltipContent>
+                                {isDisabled ? (
+                                  <p>Connections disabled — re-enable in Settings</p>
+                                ) : (
                                   <p>{directConnections[db.name]} direct connection{directConnections[db.name] > 1 ? "s" : ""} — not using PgBouncer</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                          <Database className="w-4 h-4 text-primary" />
-                        </div>
+                                )}
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground font-mono flex items-center gap-1.5">
                             {db.name}
@@ -607,9 +615,9 @@ export default function DatabasesPage() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className={`inline-flex items-center gap-1.5 text-sm ${db.active_connections > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                            <span className={`inline-flex items-center gap-1.5 text-sm ${db.active_connections > 0 && !isDisabled ? "text-foreground" : "text-muted-foreground"}`}>
                               {db.active_connections > 0 && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                <span className={`w-1.5 h-1.5 rounded-full ${isDisabled ? "bg-muted-foreground/50" : "bg-green-500 animate-pulse"}`} />
                               )}
                               {db.active_connections}
                               {connectionPeaks[db.name] && connectionPeaks[db.name].peak > 0 && (
@@ -660,6 +668,7 @@ export default function DatabasesPage() {
                         <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
+                              isDisabled ? "bg-muted-foreground/40" :
                               Number(db.cache_hit_ratio) >= 95 ? "bg-green-500" :
                               Number(db.cache_hit_ratio) >= 80 ? "bg-yellow-500" :
                               "bg-red-500"
@@ -725,7 +734,8 @@ export default function DatabasesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

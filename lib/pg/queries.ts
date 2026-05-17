@@ -33,6 +33,7 @@ export async function listDatabases(pool: Pool) {
       pg_encoding_to_char(d.encoding) AS encoding,
       pg_database_size(d.datname) AS size_bytes,
       d.datcollate AS collation,
+      d.datallowconn AS allow_connections,
       COALESCE(s.numbackends, 0)::int AS active_connections,
       COALESCE(s.xact_commit, 0)::bigint AS xact_commit,
       COALESCE(s.xact_rollback, 0)::bigint AS xact_rollback,
