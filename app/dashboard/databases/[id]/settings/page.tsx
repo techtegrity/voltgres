@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { api, type DatabaseRow } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -168,9 +169,16 @@ export default function DatabaseSettingsPage({
                 setUpdatingConnections(true)
                 try {
                   await api.databases.update(dbName, { allowConnections: next })
+                  toast.success(
+                    next
+                      ? `${dbName} is now accepting connections`
+                      : `${dbName} is no longer accepting new connections`
+                  )
                 } catch (err) {
                   setDbInfo({ ...dbInfo, allow_connections: previous })
-                  setConnectionsError((err as Error).message)
+                  const message = (err as Error).message
+                  setConnectionsError(message)
+                  toast.error(`Failed to update connections: ${message}`)
                 } finally {
                   setUpdatingConnections(false)
                 }
